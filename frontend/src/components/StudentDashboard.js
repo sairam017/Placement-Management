@@ -8,6 +8,7 @@ const StudentDashboard = () => {
   const [companies, setCompanies] = useState([]);
   const [appliedCompanies, setAppliedCompanies] = useState([]);
   const [showOnlyApplied, setShowOnlyApplied] = useState(false);
+  const [showPendingOnly, setShowPendingOnly] = useState(false);
 
   const navigate = useNavigate();
 
@@ -43,7 +44,7 @@ const StudentDashboard = () => {
         const applications = applicationsRes.data?.data || [];
 
         setCompanies(companiesData);
-        setAppliedCompanies(applications.map(app => app.companyId));
+        setAppliedCompanies(applications.map(app => app.companyId || app.companyName));
       } catch (err) {
         console.error("Error fetching data:", err);
       }
@@ -61,7 +62,7 @@ const StudentDashboard = () => {
 
       if (response.data.success) {
         alert("Applied successfully!");
-        setAppliedCompanies(prev => [...prev, company._id]);
+        setAppliedCompanies(prev => [...prev, company._id, company.companyName]);
       }
     } catch (err) {
       if (err.response?.status === 400) {
@@ -73,10 +74,13 @@ const StudentDashboard = () => {
     }
   };
 
-  const hasAppliedToCompany = (companyId) => appliedCompanies.includes(companyId);
+  const hasAppliedToCompany = (company) => 
+    appliedCompanies.includes(company._id) || appliedCompanies.includes(company.companyName);
 
   const filteredCompanies = showOnlyApplied
-    ? companies.filter((c) => hasAppliedToCompany(c._id))
+    ? companies.filter((c) => hasAppliedToCompany(c))
+    : showPendingOnly
+    ? companies.filter((c) => !hasAppliedToCompany(c))
     : companies;
 
   return (
@@ -96,6 +100,13 @@ const StudentDashboard = () => {
 
       {/* Student Info */}
       <div className="profile-section">
+        {/* Scrolling Text */}
+        <div className="scrolling-text-container">
+          <div className="scrolling-text">
+            Registered students only access the links please Register
+          </div>
+        </div>
+        
         <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
         <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
         <p><strong>Section:</strong> {student.section || <span style={{ color: 'red' }}>No Section</span>}</p>
@@ -110,14 +121,29 @@ const StudentDashboard = () => {
       {/* Filter Buttons */}
       <div className="filter-buttons">
         <button
-          className={!showOnlyApplied ? 'active' : ''}
-          onClick={() => setShowOnlyApplied(false)}
+          className={!showOnlyApplied && !showPendingOnly ? 'active' : ''}
+          onClick={() => {
+            setShowOnlyApplied(false);
+            setShowPendingOnly(false);
+          }}
         >
           All Companies
         </button>
         <button
+          className={showPendingOnly ? 'active' : ''}
+          onClick={() => {
+            setShowPendingOnly(true);
+            setShowOnlyApplied(false);
+          }}
+        >
+          Pending Companies
+        </button>
+        <button
           className={showOnlyApplied ? 'active' : ''}
-          onClick={() => setShowOnlyApplied(true)}
+          onClick={() => {
+            setShowOnlyApplied(true);
+            setShowPendingOnly(false);
+          }}
         >
           Applied Companies
         </button>
@@ -125,9 +151,21 @@ const StudentDashboard = () => {
 
       {/* Companies Table */}
       <div className="companies-table-section">
-        <h3>{showOnlyApplied ? "Applied Companies" : "On-going Companies"}</h3>
+        <h3>
+          {showOnlyApplied 
+            ? "Applied Companies" 
+            : showPendingOnly 
+            ? "Pending Companies" 
+            : "On-going Companies"}
+        </h3>
         {filteredCompanies.length === 0 ? (
-          <p>{showOnlyApplied ? "No applied companies." : "No companies available."}</p>
+          <p>
+            {showOnlyApplied 
+              ? "No applied companies." 
+              : showPendingOnly 
+              ? "No pending companies." 
+              : "No companies available."}
+          </p>
         ) : (
           <table className="companies-table">
             <thead>
@@ -147,7 +185,7 @@ const StudentDashboard = () => {
                   <td>{comp.ctc}</td>
                   <td>{comp.description}</td>
                   <td>
-                    {hasAppliedToCompany(comp._id) ? (
+                    {hasAppliedToCompany(comp) ? (
                       <span className="applied-status">✓ Applied</span>
                     ) : (
                       <button className="apply-button" onClick={() => handleApply(comp)}>

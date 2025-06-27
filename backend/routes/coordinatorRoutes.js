@@ -6,7 +6,8 @@ const {
   getAllCoordinators,
   getCoordinatorById,
   updateCoordinator,
-  loginCoordinator
+  loginCoordinator,
+  changePassword
 } = require("../controllers/coordinatorController");
 
 // Routes - PERMANENT STORAGE ONLY
@@ -16,5 +17,6 @@ router.get("/coordinator/:id", getCoordinatorById);
 router.put("/coordinator/:id", updateCoordinator);     // Update allowed for user management
 // DELETE route removed - NO DELETION ALLOWED
 router.post("/login", loginCoordinator);
+router.put("/change-password", changePassword);
 
 module.exports = router;

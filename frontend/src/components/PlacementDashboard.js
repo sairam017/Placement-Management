@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import './PlacementDashboard.css'; // Assuming you have a CSS file for styling
 
 const PlacementDashboard = () => {
   const [studentPlacements, setStudentPlacements] = useState([]);
@@ -11,6 +12,7 @@ const PlacementDashboard = () => {
   const [filter, setFilter] = useState("all");
   const [filterCompany, setFilterCompany] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [customCompanyName, setCustomCompanyName] = useState("");
   const [packageCTC, setPackageCTC] = useState("");
   const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
@@ -18,6 +20,14 @@ const PlacementDashboard = () => {
   const [companies, setCompanies] = useState([]); // List of companies from backend
   const [companyMap, setCompanyMap] = useState({}); // { companyName: companyId }
   const [applications, setApplications] = useState([]); // Store all applications
+  
+  // Password change states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   const fetchCoordinatorAndData = async () => {
     const token = localStorage.getItem("token");
@@ -97,8 +107,14 @@ const PlacementDashboard = () => {
   }, [filterCompany]);
 
   const handleAddPlacement = async () => {
-    if (!companyName || !packageCTC || !role || !description) {
+    const finalCompanyName = companyName === "Others" ? customCompanyName : companyName;
+    
+    if (!finalCompanyName || !packageCTC || !role || !description) {
       alert("Please fill all required fields (Company Name, CTC, Role, Description).");
+      return;
+    }
+    if (companyName === "Others" && !customCompanyName.trim()) {
+      alert("Please enter a custom company name.");
       return;
     }
     if (!coordinator?.department) {
@@ -107,7 +123,7 @@ const PlacementDashboard = () => {
     }
     try {
       const payload = {
-        companyName,
+        companyName: finalCompanyName,
         ctc: parseFloat(packageCTC),
         role,
         description,
@@ -119,6 +135,7 @@ const PlacementDashboard = () => {
       console.log("Response:", response.data); // Debug log
       alert("Company added successfully!");
       setCompanyName("");
+      setCustomCompanyName("");
       setPackageCTC("");
       setRole("");
       setDescription("");
@@ -200,19 +217,62 @@ const PlacementDashboard = () => {
 
   const filteredStudents = getFilteredStudents();
 
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      alert("Please fill all password fields.");
+      return;
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("New password and confirm password don't match.");
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 4) {
+      alert("New password must be at least 4 characters long.");
+      return;
+    }
+
+    try {
+      const response = await axios.put('http://localhost:5000/api/coordinators/change-password', {
+        employeeId: coordinator.employeeId,
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      
+      alert("Password changed successfully!");
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      console.error("Error changing password:", err);
+      alert(`Failed to change password: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
   return (
     <div className="container mt-4 position-relative">
-      <button
-        className="btn btn-danger position-absolute"
-        style={{ top: 0, right: 0 }}
-        onClick={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("coordinator");
-          window.location.href = "/";
-        }}
-      >
-        Logout
-      </button>
+      <div className="d-flex justify-content-end position-absolute" style={{ top: 0, right: 0 }}>
+        <button
+          className="btn btn-warning me-2"
+          onClick={() => setShowPasswordModal(true)}
+        >
+          Change Password
+        </button>
+        <button
+          className="btn btn-danger"
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("coordinator");
+            window.location.href = "/";
+          }}
+        >
+          Logout
+        </button>
+      </div>
       <h2>Welcome, {coordinator?.name}</h2>
       <p><strong>Department:</strong> {coordinator?.department}</p>
 
@@ -226,8 +286,8 @@ const PlacementDashboard = () => {
             onChange={(e) => setFilterCompany(e.target.value)}
           >
             <option value="">-- Filter by Company --</option>
-            {companies.map((c) => (
-              <option key={c._id} value={c.companyName}>{c.companyName}</option>
+            {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
+              <option key={companyName} value={companyName}>{companyName}</option>
             ))}
           </select>
           <button
@@ -355,10 +415,21 @@ const PlacementDashboard = () => {
               <option value="OYO Rooms">OYO Rooms</option>
               <option value="Boat">Boat</option>
               <option value="Udaan">Udaan</option>
-              <option value="Paytm">Others</option>
+              <option value="Others">Others</option>
             </optgroup>
           </select>
         </div>
+        {companyName === "Others" && (
+          <div className="col-md-3">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Enter Company Name"
+              value={customCompanyName}
+              onChange={(e) => setCustomCompanyName(e.target.value)}
+            />
+          </div>
+        )}
         <div className="col-md-2">
           <input
             type="number"
@@ -401,6 +472,89 @@ const PlacementDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Change Password</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label htmlFor="currentPassword" className="form-label">Current Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="currentPassword"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="newPassword" className="form-label">New Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="newPassword"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                    placeholder="Enter new password (min 4 characters)"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="confirmPassword" className="form-label">Confirm New Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="confirmPassword"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleChangePassword}
+                >
+                  Change Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
