@@ -9,6 +9,7 @@ const companyRoutes = require("./routes/companyRoutes");
 const studentPlacementRoutes = require("./routes/studentPlacementRoutes");
 const coordinatorRoutes = require("./routes/coordinatorRoutes");
 const tpoRoutes = require("./routes/tpoRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
 
 dotenv.config();
 
@@ -26,7 +27,6 @@ const connectDB = async () => {
       useUnifiedTopology: true
     });
     console.log("✅ MongoDB connected successfully - PERMANENT STORAGE MODE");
-    console.log("ℹ️  All data will be stored permanently with no deletion or cleanup");
     
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
@@ -46,6 +46,7 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/coordinators", coordinatorRoutes);
 app.use("/api/tpos", tpoRoutes);
 app.use("/api/student-placement", studentPlacementRoutes);
+app.use("/api/applications", applicationRoutes);
 
 // Default route
 app.get("/", (req, res) => {

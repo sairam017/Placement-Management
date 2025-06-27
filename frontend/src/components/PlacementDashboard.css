@@ -150,6 +150,7 @@
     text-align: left;
   }
 }
+
 .placement-dashboard .back-button {
   position: absolute;
   top: 16px;
@@ -157,8 +158,17 @@
   padding: 8px 12px;
   font-size: 14px;
   background-color: #f8f9fa;
-  color: #343a40;
+  color: #a8e064;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.placement-dashboard select.form-select-sm {
+  min-width: 200px;
+}
+
+.placement-dashboard .table th,
+.placement-dashboard .table td {
+  vertical-align: middle;
 }

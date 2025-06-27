@@ -4,194 +4,97 @@ import axios from 'axios';
 import './StudentDashboard.css';
 
 const StudentDashboard = () => {
-  const [student, setStudent] = useState({
-    name: '',
-    UID: '',
-    department: '',
-    section: ''
-  });
-
+  const [student, setStudent] = useState({ name: '', UID: '', department: '', section: '' });
   const [companies, setCompanies] = useState([]);
-  const [appliedCompanies, setAppliedCompanies] = useState([]); // To track applied companies
-  const [applicationStatuses, setApplicationStatuses] = useState({}); // To track application statuses
+  const [appliedCompanies, setAppliedCompanies] = useState([]);
+  const [showOnlyApplied, setShowOnlyApplied] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Fetch student data from localStorage
-    const fetchStudentData = () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/";
-        return;
-      }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/";
+      return;
+    }
 
-      let storedUser = null;
-      try {
-        const rawUser = localStorage.getItem("user");
-        storedUser = rawUser && rawUser !== 'undefined' ? JSON.parse(rawUser) : null;
-      } catch {
-        storedUser = null;
-      }
-
-      if (storedUser && storedUser.name && storedUser.UID && storedUser.section) {
+    try {
+      const rawUser = localStorage.getItem("user");
+      const storedUser = rawUser && rawUser !== 'undefined' ? JSON.parse(rawUser) : null;
+      if (storedUser?.name && storedUser?.UID && storedUser?.section) {
         setStudent(storedUser);
-      } else {
-        setStudent({ name: '', UID: '', department: '', section: '' });
       }
-    };
-
-    fetchStudentData();
+    } catch (err) {
+      console.error("Error parsing user from localStorage:", err);
+    }
   }, []);
 
   useEffect(() => {
-    // Fetch companies when student.department is available
-    const fetchCompanies = async () => {
-      if (!student.department) return;
+    const fetchData = async () => {
+      if (!student.department || !student.UID) return;
+
       try {
-        const res = await axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`);
-        const companiesData = res.data.data || [];
+        const [companiesRes, applicationsRes] = await Promise.all([
+          axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`),
+          axios.get(`http://localhost:5000/api/applications/student/${student.UID}`)
+        ]);
+
+        const companiesData = companiesRes.data?.data || [];
+        const applications = applicationsRes.data?.data || [];
+
         setCompanies(companiesData);
+        setAppliedCompanies(applications.map(app => app.companyId));
       } catch (err) {
-        console.error('Error fetching companies:', err);
+        console.error("Error fetching data:", err);
       }
     };
 
-    // Fetch student's applied companies
-    const fetchStudentPlacements = async () => {
-      if (!student.UID) return;
-      try {
-        const res = await axios.get(`http://localhost:5000/api/student-placement/${student.UID}`);
-        // Expecting a single student placement document with applications array
-        const applications = res.data.applications || [];
-        const applied = applications.filter(app => app.status !== "not applied").map(app => app.companyId);
-        setAppliedCompanies(applied);
-        
-        // Create status map for all applications
-        const statusMap = {};
-        applications.forEach(app => {
-          statusMap[app.companyId] = app.status;
-        });
-        setApplicationStatuses(statusMap);
-      } catch (err) {
-        console.error('Error fetching student placements:', err);
-      }
-    };
-
-    fetchCompanies();
-    fetchStudentPlacements();
+    fetchData();
   }, [student.department, student.UID]);
 
-  // Update handleApply to use the new status update endpoint
   const handleApply = async (company) => {
     try {
-      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
-        UID: Number(student.UID), // Ensure UID is sent as a Number
-        companyId: company._id,
-        status: "applied"
+      const response = await axios.post(`http://localhost:5000/api/applications/apply`, {
+        studentUID: student.UID,
+        companyId: company._id
       });
-      setAppliedCompanies(prev => [...prev, company._id]);
-      setApplicationStatuses(prev => ({...prev, [company._id]: "applied"}));
-      alert("Application status updated to 'Applied'");
-    } catch (err) {
-      console.error("Error updating application status:", err);
-      alert("Failed to update application status.");
-    }
-  };
 
-  // Function to update application status
-  const updateApplicationStatus = async (company, newStatus) => {
-    try {
-      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
-        UID: Number(student.UID),
-        companyId: company._id,
-        status: newStatus
-      });
-      
-      if (newStatus !== "not applied") {
-        setAppliedCompanies(prev => [...new Set([...prev, company._id])]);
-      } else {
-        setAppliedCompanies(prev => prev.filter(id => id !== company._id));
+      if (response.data.success) {
+        alert("Applied successfully!");
+        setAppliedCompanies(prev => [...prev, company._id]);
       }
-      setApplicationStatuses(prev => ({...prev, [company._id]: newStatus}));
-      alert(`Application status updated to '${newStatus}'`);
     } catch (err) {
-      console.error("Error updating application status:", err);
-      alert("Failed to update application status.");
-    }
-  };
-
-  // Handle status update
-  const handleStatusUpdate = async (company, newStatus) => {
-    try {
-      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
-        UID: Number(student.UID),
-        companyId: company._id,
-        status: newStatus
-      });
-      
-      // Update local state
-      setApplicationStatuses(prev => ({
-        ...prev,
-        [company._id]: newStatus
-      }));
-      
-      if (newStatus !== "not applied") {
-        setAppliedCompanies(prev => {
-          if (!prev.includes(company._id)) {
-            return [...prev, company._id];
-          }
-          return prev;
-        });
+      if (err.response?.status === 400) {
+        alert("You have already applied to this company.");
       } else {
-        setAppliedCompanies(prev => prev.filter(id => id !== company._id));
+        alert("Failed to apply. Please try again.");
       }
-      
-      alert(`Application status updated to '${newStatus}'`);
-    } catch (err) {
-      console.error("Error updating application status:", err);
-      alert("Failed to update application status.");
+      console.error("Apply error:", err);
     }
   };
 
-  // Helper function to get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'applied': return '#2196f3';
-      case 'interview': return '#ff9800';
-      case 'selected': return '#4caf50';
-      case 'rejected': return '#f44336';
-      case 'offer': return '#9c27b0';
-      default: return '#9e9e9e';
-    }
-  };
+  const hasAppliedToCompany = (companyId) => appliedCompanies.includes(companyId);
+
+  const filteredCompanies = showOnlyApplied
+    ? companies.filter((c) => hasAppliedToCompany(c._id))
+    : companies;
 
   return (
     <div className="student-dashboard">
-      {/* Logout Button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '1rem' }}>
+      {/* Logout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
         <button
           className="logout-btn"
           onClick={() => {
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
-            localStorage.removeItem('coordinator');
-            window.location.href = '/';
-          }}
-          style={{
-            background: '#f44336',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '0.5rem 1rem',
-            cursor: 'pointer'
+            localStorage.clear();
+            window.location.href = "/";
           }}
         >
           Logout
         </button>
       </div>
 
-      {/* Credentials Section */}
+      {/* Student Info */}
       <div className="profile-section">
         <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
         <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
@@ -204,53 +107,58 @@ const StudentDashboard = () => {
         </button>
       </div>
 
-      {/* Companies Section */}
-      <div className="companies-section" style={{ marginTop: '2rem' }}>
-        <h3>On going companies</h3>
-        {companies.length === 0 ? (
-          <p>No companies available.</p>
+      {/* Filter Buttons */}
+      <div className="filter-buttons">
+        <button
+          className={!showOnlyApplied ? 'active' : ''}
+          onClick={() => setShowOnlyApplied(false)}
+        >
+          All Companies
+        </button>
+        <button
+          className={showOnlyApplied ? 'active' : ''}
+          onClick={() => setShowOnlyApplied(true)}
+        >
+          Applied Companies
+        </button>
+      </div>
+
+      {/* Companies Table */}
+      <div className="companies-table-section">
+        <h3>{showOnlyApplied ? "Applied Companies" : "On-going Companies"}</h3>
+        {filteredCompanies.length === 0 ? (
+          <p>{showOnlyApplied ? "No applied companies." : "No companies available."}</p>
         ) : (
-          <ul>
-            {companies.map((comp) => (
-              <li key={comp._id} style={{ marginBottom: '0.5rem', padding: '0.5rem', borderBottom: '1px solid #ccc' }}>
-                <strong>{comp.companyName}</strong> - {comp.role}, {comp.ctc} LPA
-                <br />
-                <em>{comp.description}</em>
-                <br />
-                <div style={{ marginTop: '0.5rem' }}>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: 'bold' }}>Status: </span>
-                    <span style={{ 
-                      color: applicationStatuses[comp._id] === 'applied' ? 'blue' : 
-                             applicationStatuses[comp._id] === 'selected' ? 'green' : 
-                             applicationStatuses[comp._id] === 'rejected' ? 'red' : 
-                             applicationStatuses[comp._id] === 'interview' ? 'orange' : 
-                             applicationStatuses[comp._id] === 'offer' ? 'purple' : 'gray' 
-                    }}>
-                      {applicationStatuses[comp._id] || 'not applied'}
-                    </span>
-                  </div>
-                  <select
-                    value={applicationStatuses[comp._id] || 'not applied'}
-                    onChange={(e) => handleStatusUpdate(comp, e.target.value)}
-                    style={{
-                      marginRight: '0.5rem',
-                      padding: '0.3rem',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc'
-                    }}
-                  >
-                    <option value="not applied">Not Applied</option>
-                    <option value="applied">Applied</option>
-                    <option value="interview">Interview Scheduled</option>
-                    <option value="selected">Selected</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="offer">Offer Received</option>
-                  </select>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="companies-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Role</th>
+                <th>CTC (LPA)</th>
+                <th>Description</th>
+                <th>Status / Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCompanies.map((comp) => (
+                <tr key={comp._id}>
+                  <td>{comp.companyName}</td>
+                  <td>{comp.role}</td>
+                  <td>{comp.ctc}</td>
+                  <td>{comp.description}</td>
+                  <td>
+                    {hasAppliedToCompany(comp._id) ? (
+                      <span className="applied-status">✓ Applied</span>
+                    ) : (
+                      <button className="apply-button" onClick={() => handleApply(comp)}>
+                        Apply
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
