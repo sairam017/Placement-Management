@@ -1,0 +1,164 @@
+.placement-dashboard {
+  max-width: 1000px;
+  margin: 30px auto;
+  padding: 24px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.placement-dashboard h2 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 16px;
+}
+
+.placement-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  background: #fff;
+}
+
+.placement-dashboard th,
+.placement-dashboard td {
+  border: 1px solid #e0e0e0;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.placement-dashboard th {
+  background: #dad693;
+  color: #5eb3e8;
+}
+
+.placement-dashboard tr:hover {
+  background-color: #f1f8ff;
+}
+
+.placement-dashboard button,
+.placement-dashboard input[type="text"],
+.placement-dashboard input[type="number"] {
+  border-radius: 6px;
+  transition: 0.2s ease-in-out;
+}
+
+.placement-dashboard button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.placement-dashboard button:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.placement-dashboard input[type="text"],
+.placement-dashboard input[type="number"] {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  width: 100%;
+}
+
+.placement-dashboard input[type="text"]:focus,
+.placement-dashboard input[type="number"]:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 3px #3498db;
+}
+
+.placement-dashboard .btn-primary {
+  background-color: #3498db;
+  border: none;
+  color: #fff;
+}
+
+.placement-dashboard .btn-outline-primary {
+  border: 1px solid #3498db;
+  color: #3498db;
+  background: #fff;
+}
+
+.placement-dashboard .btn-outline-primary:hover {
+  background: #3498db;
+  color: #fff;
+}
+
+.placement-dashboard .btn-outline-success {
+  border: 1px solid #2ecc71;
+  color: #2ecc71;
+  background: #fff;
+}
+
+.placement-dashboard .btn-outline-success:hover {
+  background: #2ecc71;
+  color: #fff;
+}
+
+.placement-dashboard .btn-success {
+  background-color: #2ecc71;
+  border: none;
+  color: #fff;
+}
+
+.placement-dashboard .btn-danger {
+  background-color: #e74c3c;
+  border: none;
+  color: #fff;
+}
+
+.placement-dashboard .btn-danger:hover {
+  background-color: #c0392b;
+}
+
+.placement-dashboard .filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .placement-dashboard table,
+  .placement-dashboard thead,
+  .placement-dashboard tbody,
+  .placement-dashboard th,
+  .placement-dashboard td,
+  .placement-dashboard tr {
+    display: block;
+  }
+
+  .placement-dashboard tr {
+    margin-bottom: 15px;
+  }
+
+  .placement-dashboard td {
+    text-align: right;
+    position: relative;
+    padding-left: 50%;
+  }
+
+  .placement-dashboard td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    width: 45%;
+    padding-right: 10px;
+    font-weight: bold;
+    text-align: left;
+  }
+}
+.placement-dashboard .back-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px 12px;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  color: #343a40;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

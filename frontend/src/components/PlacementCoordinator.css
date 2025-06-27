@@ -1,0 +1,59 @@
+.dashboard-container {
+  max-width: 1000px;
+  margin: 30px auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.dashboard-title {
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.dropdown-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.dropdown {
+  padding: 10px;
+  width: 250px;
+  font-size: 16px;
+}
+
+.count-boxes {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 30px;
+}
+
+.box {
+  flex: 1;
+  margin: 10px;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  color: white;
+}
+
+.applied-box {
+  background-color: #28a745;
+}
+
+.not-applied-box {
+  background-color: #dc3545;
+}
+
+.student-list {
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+}
+
+.placeholder {
+  text-align: center;
+  color: gray;
+  margin-top: 40px;
+}
