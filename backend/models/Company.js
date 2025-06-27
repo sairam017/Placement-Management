@@ -33,6 +33,14 @@ const companySchema = new mongoose.Schema({
   },
 });
 
+// Create a compound unique index to allow same company with different student groups
+companySchema.index({ 
+  companyName: 1, 
+  role: 1, 
+  department: 1, 
+  studentUIDs: 1 
+}, { unique: true, sparse: true });
+
 // Drop the collection and recreate it to remove any conflicting indexes
 companySchema.pre('save', function() {
   // This will be called before saving

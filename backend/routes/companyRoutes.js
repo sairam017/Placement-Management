@@ -5,6 +5,12 @@ const companyController = require("../controllers/companyController");
 // POST /api/companies - Add new company
 router.post("/", companyController.addCompany);
 
+// POST /api/companies/add-students - Add students to existing company
+router.post("/add-students", companyController.addStudentsToCompany);
+
+// POST /api/companies/cleanup-database - Clean up database indexes (utility)
+router.post("/cleanup-database", companyController.cleanupDatabase);
+
 // GET /api/companies/opportunities?department=XYZ - Get companies by department
 router.get("/opportunities", companyController.getCompaniesByDepartment);
 
