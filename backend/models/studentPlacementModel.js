@@ -16,8 +16,12 @@ const studentPlacementSchema = new mongoose.Schema({
   applications: [
     {
       companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-      applied: { type: Boolean, default: false },
-      appliedAt: { type: Date }
+      companyName: { type: String },
+      role: { type: String },
+      ctc: { type: Number },
+      status: { type: String, default: "not applied", enum: ["not applied", "applied", "selected", "rejected", "interview", "offer"] },
+      appliedAt: { type: Date },
+      updatedAt: { type: Date, default: Date.now }
     }
   ],
   createdAt: { type: Date, default: Date.now }

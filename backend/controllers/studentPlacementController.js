@@ -49,39 +49,104 @@ exports.registerPlacement = async (req, res) => {
   }
 };
 
-// ✅ Apply for company
+// ✅ Apply for company - now updates status to "applied"
 exports.applyForCompany = async (req, res) => {
   try {
     const { UID, companyId } = req.body;
     console.log('applyForCompany UID:', UID, 'companyId:', companyId); // Debug log
+    
     const student = await StudentPlacement.findOne({ UID });
     console.log('Found student:', student ? student.UID : 'None'); // Debug log
+    
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Find the company to get its details
+    const Company = require('../models/Company');
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
     }
 
     const existingApp = student.applications.find(app => app.companyId.toString() === companyId);
 
     if (existingApp) {
-      if (existingApp.applied) {
+      if (existingApp.status !== "not applied") {
         return res.status(400).json({ message: 'Already applied for this company' });
       } else {
-        existingApp.applied = true;
+        existingApp.status = "applied";
+        existingApp.appliedAt = new Date();
+        existingApp.updatedAt = new Date();
+      }
+    } else {
+      student.applications.push({
+        companyId,
+        companyName: company.companyName,
+        role: company.role,
+        ctc: company.ctc,
+        status: "applied",
+        appliedAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    await student.save();
+    res.status(200).json({ message: 'Application status updated successfully' });
+
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to apply for company', error: err.message });
+  }
+};
+
+// ✅ Update application status
+exports.updateApplicationStatus = async (req, res) => {
+  try {
+    const { UID, companyId, status } = req.body;
+    
+    // Validate status
+    const validStatuses = ["not applied", "applied", "selected", "rejected", "interview", "offer"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    
+    const student = await StudentPlacement.findOne({ UID });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Find the company to get its details if not exists in application
+    const Company = require('../models/Company');
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const existingApp = student.applications.find(app => app.companyId.toString() === companyId);
+
+    if (existingApp) {
+      existingApp.status = status;
+      existingApp.updatedAt = new Date();
+      if (status === "applied" && !existingApp.appliedAt) {
         existingApp.appliedAt = new Date();
       }
     } else {
       student.applications.push({
         companyId,
-        applied: true,
-        appliedAt: new Date()
+        companyName: company.companyName,
+        role: company.role,
+        ctc: company.ctc,
+        status: status,
+        appliedAt: status === "applied" ? new Date() : null,
+        updatedAt: new Date()
       });
     }
 
     await student.save();
-    res.status(200).json({ message: 'Application recorded successfully' });
+    res.status(200).json({ message: 'Application status updated successfully' });
 
   } catch (err) {
-    res.status(500).json({ message: 'Failed to apply for company', error: err.message });
+    res.status(500).json({ message: 'Failed to update application status', error: err.message });
   }
 };
 

@@ -13,6 +13,7 @@ const StudentDashboard = () => {
 
   const [companies, setCompanies] = useState([]);
   const [appliedCompanies, setAppliedCompanies] = useState([]); // To track applied companies
+  const [applicationStatuses, setApplicationStatuses] = useState({}); // To track application statuses
 
   const navigate = useNavigate();
 
@@ -63,8 +64,15 @@ const StudentDashboard = () => {
         const res = await axios.get(`http://localhost:5000/api/student-placement/${student.UID}`);
         // Expecting a single student placement document with applications array
         const applications = res.data.applications || [];
-        const applied = applications.filter(app => app.applied).map(app => app.companyId);
+        const applied = applications.filter(app => app.status !== "not applied").map(app => app.companyId);
         setAppliedCompanies(applied);
+        
+        // Create status map for all applications
+        const statusMap = {};
+        applications.forEach(app => {
+          statusMap[app.companyId] = app.status;
+        });
+        setApplicationStatuses(statusMap);
       } catch (err) {
         console.error('Error fetching student placements:', err);
       }
@@ -74,17 +82,87 @@ const StudentDashboard = () => {
     fetchStudentPlacements();
   }, [student.department, student.UID]);
 
-  // Update handleApply to use the correct endpoint and payload
+  // Update handleApply to use the new status update endpoint
   const handleApply = async (company) => {
     try {
-      await axios.post(`http://localhost:5000/api/student-placement/apply`, {
+      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
         UID: Number(student.UID), // Ensure UID is sent as a Number
-        companyId: company._id
+        companyId: company._id,
+        status: "applied"
       });
       setAppliedCompanies(prev => [...prev, company._id]);
+      setApplicationStatuses(prev => ({...prev, [company._id]: "applied"}));
+      alert("Application status updated to 'Applied'");
     } catch (err) {
-      console.error("Error applying for company:", err);
-      alert("Failed to apply for this company.");
+      console.error("Error updating application status:", err);
+      alert("Failed to update application status.");
+    }
+  };
+
+  // Function to update application status
+  const updateApplicationStatus = async (company, newStatus) => {
+    try {
+      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
+        UID: Number(student.UID),
+        companyId: company._id,
+        status: newStatus
+      });
+      
+      if (newStatus !== "not applied") {
+        setAppliedCompanies(prev => [...new Set([...prev, company._id])]);
+      } else {
+        setAppliedCompanies(prev => prev.filter(id => id !== company._id));
+      }
+      setApplicationStatuses(prev => ({...prev, [company._id]: newStatus}));
+      alert(`Application status updated to '${newStatus}'`);
+    } catch (err) {
+      console.error("Error updating application status:", err);
+      alert("Failed to update application status.");
+    }
+  };
+
+  // Handle status update
+  const handleStatusUpdate = async (company, newStatus) => {
+    try {
+      await axios.post(`http://localhost:5000/api/student-placement/update-status`, {
+        UID: Number(student.UID),
+        companyId: company._id,
+        status: newStatus
+      });
+      
+      // Update local state
+      setApplicationStatuses(prev => ({
+        ...prev,
+        [company._id]: newStatus
+      }));
+      
+      if (newStatus !== "not applied") {
+        setAppliedCompanies(prev => {
+          if (!prev.includes(company._id)) {
+            return [...prev, company._id];
+          }
+          return prev;
+        });
+      } else {
+        setAppliedCompanies(prev => prev.filter(id => id !== company._id));
+      }
+      
+      alert(`Application status updated to '${newStatus}'`);
+    } catch (err) {
+      console.error("Error updating application status:", err);
+      alert("Failed to update application status.");
+    }
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'applied': return '#2196f3';
+      case 'interview': return '#ff9800';
+      case 'selected': return '#4caf50';
+      case 'rejected': return '#f44336';
+      case 'offer': return '#9c27b0';
+      default: return '#9e9e9e';
     }
   };
 
@@ -140,38 +218,35 @@ const StudentDashboard = () => {
                 <em>{comp.description}</em>
                 <br />
                 <div style={{ marginTop: '0.5rem' }}>
-                  <button
-                    onClick={() => {
-                      if (!appliedCompanies.includes(comp._id)) {
-                        handleApply(comp);
-                      }
-                    }}
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 'bold' }}>Status: </span>
+                    <span style={{ 
+                      color: applicationStatuses[comp._id] === 'applied' ? 'blue' : 
+                             applicationStatuses[comp._id] === 'selected' ? 'green' : 
+                             applicationStatuses[comp._id] === 'rejected' ? 'red' : 
+                             applicationStatuses[comp._id] === 'interview' ? 'orange' : 
+                             applicationStatuses[comp._id] === 'offer' ? 'purple' : 'gray' 
+                    }}>
+                      {applicationStatuses[comp._id] || 'not applied'}
+                    </span>
+                  </div>
+                  <select
+                    value={applicationStatuses[comp._id] || 'not applied'}
+                    onChange={(e) => handleStatusUpdate(comp, e.target.value)}
                     style={{
-                      background: appliedCompanies.includes(comp._id) ? 'green' : '#2196f3',
-                      color: '#fff',
-                      border: 'none',
+                      marginRight: '0.5rem',
+                      padding: '0.3rem',
                       borderRadius: '4px',
-                      padding: '0.3rem 0.8rem',
-                      cursor: appliedCompanies.includes(comp._id) ? 'default' : 'pointer',
-                      marginRight: '0.5rem'
+                      border: '1px solid #ccc'
                     }}
-                    disabled={appliedCompanies.includes(comp._id)}
                   >
-                    {appliedCompanies.includes(comp._id) ? 'Applied' : 'applied'}
-                  </button>
-                  <button
-                    style={{
-                      background: '#9e9e9e',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.3rem 0.8rem',
-                      cursor: 'not-allowed'
-                    }}
-                    disabled
-                  >
-                    Not Applied
-                  </button>
+                    <option value="not applied">Not Applied</option>
+                    <option value="applied">Applied</option>
+                    <option value="interview">Interview Scheduled</option>
+                    <option value="selected">Selected</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="offer">Offer Received</option>
+                  </select>
                 </div>
               </li>
             ))}

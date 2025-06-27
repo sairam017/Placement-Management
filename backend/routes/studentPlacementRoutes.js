@@ -45,6 +45,9 @@ router.get('/selected', studentPlacementController.getSelectedStudentDetails);
 // ✅ Get all student placements
 router.get('/all', studentPlacementController.getAllStudentPlacements);
 
+// ✅ Update application status
+router.post('/update-status', studentPlacementController.updateApplicationStatus);
+
 // ✅ Get student by UID (must be last GET route to avoid conflicts)
 router.get('/:UID', studentPlacementController.getStudentByUID);
 

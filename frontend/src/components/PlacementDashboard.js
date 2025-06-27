@@ -15,9 +15,7 @@ const PlacementDashboard = () => {
   const [packageCTC, setPackageCTC] = useState("");
   const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
-  const [studentUIDInput, setStudentUIDInput] = useState("");
-  const [selectedUIDs, setSelectedUIDs] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState([]);
 
   const [companies, setCompanies] = useState([]); // List of companies from backend
   const [companyMap, setCompanyMap] = useState({}); // { companyName: companyId }
@@ -59,8 +57,16 @@ const PlacementDashboard = () => {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/placement/companies");
-        if (Array.isArray(res.data)) {
+        const res = await axios.get("http://localhost:5000/api/companies/all");
+        console.log("Companies response:", res.data); // Debug log
+        if (Array.isArray(res.data.data)) {
+          setCompanies(res.data.data);
+          const map = {};
+          res.data.data.forEach((c) => {
+            map[c.companyName] = c._id;
+          });
+          setCompanyMap(map);
+        } else if (Array.isArray(res.data)) {
           setCompanies(res.data);
           const map = {};
           res.data.forEach((c) => {
@@ -69,7 +75,7 @@ const PlacementDashboard = () => {
           setCompanyMap(map);
         }
       } catch (err) {
-        // handle error
+        console.error("Error fetching companies:", err);
       }
     };
     fetchCompanies();
@@ -87,79 +93,67 @@ const PlacementDashboard = () => {
   }, [filterCompany]);
 
   // Filtered students by company
-  let appliedStudents = [];
-  let notAppliedStudents = [];
   if (filterCompany) {
-    appliedStudents = studentPlacements.filter((s) =>
-      Array.isArray(s.placements) &&
-      s.placements.some((p) => p.companyName === filterCompany)
-    );
-    notAppliedStudents = studentPlacements.filter((s) =>
-      !Array.isArray(s.placements) ||
-      !s.placements.some((p) => p.companyName === filterCompany)
-    );
-  } else {
-    appliedStudents = studentPlacements.filter((s) => s.hasPlacement);
-    notAppliedStudents = studentPlacements.filter((s) => !s.hasPlacement);
+    // Filter logic for specific company (if needed for future features)
   }
 
-  const handleSelectAll = () => {
-    if (!selectAll) {
-      const allUIDs = filteredStudents.map((s) => s.UID);
-      setSelectedUIDs(allUIDs);
-    } else {
-      setSelectedUIDs([]);
-    }
-    setSelectAll(!selectAll);
-  };
-
-  const handleSelectStudent = (uid) => {
-    setSelectedUIDs((prev) =>
-      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
-    );
-  };
-
   const handleAddPlacement = async () => {
-    let targetUIDs = [];
-
-    if (studentUIDInput.trim()) {
-      targetUIDs = [studentUIDInput.trim()];
-    } else if (selectedUIDs.length > 0) {
-      targetUIDs = selectedUIDs;
+    if (!companyName || !packageCTC || !role || !description) {
+      alert("Please fill all required fields (Company Name, CTC, Role, Description).");
+      return;
     }
 
-    if (!companyName || !packageCTC || !role || targetUIDs.length === 0) {
-      alert("Please fill all fields and select or enter at least one UID.");
+    if (!coordinator?.department) {
+      alert("Department information is missing.");
       return;
     }
 
     try {
       const payload = {
-        studentUID: targetUIDs,
         companyName,
         ctc: parseFloat(packageCTC),
         role,
-        description
+        description,
+        department: coordinator.department,
+        studentUIDs: selectedStudents
       };
 
-      await axios.post(`http://localhost:5000/api/placement/placements`, payload);
+      console.log("Sending payload:", payload); // Debug log
 
-      alert("Placement added!");
+      const response = await axios.post(`http://localhost:5000/api/companies`, payload);
+      
+      console.log("Response:", response.data); // Debug log
+
+      alert("Company added successfully!");
 
       setCompanyName("");
       setPackageCTC("");
       setRole("");
       setDescription("");
-      setStudentUIDInput("");
-      setSelectedUIDs([]);
-      setSelectAll(false);
+      setSelectedStudents([]);
 
-      setLoading(true);
-      await fetchCoordinatorAndData();
+      // Refresh companies list
+      const fetchCompanies = async () => {
+        try {
+          const res = await axios.get("http://localhost:5000/api/companies/all");
+          if (Array.isArray(res.data.data)) {
+            setCompanies(res.data.data);
+            const map = {};
+            res.data.data.forEach((c) => {
+              map[c.companyName] = c._id;
+            });
+            setCompanyMap(map);
+          }
+        } catch (err) {
+          console.error("Error fetching companies:", err);
+        }
+      };
+      await fetchCompanies();
 
     } catch (err) {
-      console.error("Error adding placement:", err);
-      alert("Failed to add placement.");
+      console.error("Error adding company:", err);
+      console.error("Error response:", err.response?.data); // Debug log
+      alert(`Failed to add company: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -183,16 +177,34 @@ const PlacementDashboard = () => {
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "placements.xlsx");
   };
 
+  const handleStudentSelect = (uid) => {
+    setSelectedStudents(prev => {
+      if (prev.includes(uid)) {
+        return prev.filter(id => id !== uid);
+      } else {
+        return [...prev, uid];
+      }
+    });
+  };
+
+  const handleSelectAllStudents = () => {
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents.map(s => s.UID));
+    }
+  };
+
   // Helper to check if student applied to selected company (by companyId)
   const isAppliedToCompany = (student, companyId) => {
     return (
       Array.isArray(student.applications) &&
-      student.applications.some((app) => app.companyId === companyId && app.applied)
+      student.applications.some((app) => app.companyId === companyId && app.status !== "not applied")
     );
   };
   // Helper to check if student has any application
   const hasAnyApplication = (student) => {
-    return Array.isArray(student.applications) && student.applications.some((app) => app.applied);
+    return Array.isArray(student.applications) && student.applications.some((app) => app.status !== "not applied");
   };
 
   // Filtering logic
@@ -286,6 +298,13 @@ const PlacementDashboard = () => {
         <table className="table table-bordered">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                  onChange={handleSelectAllStudents}
+                />
+              </th>
               <th>#</th>
               <th>Name</th>
               <th>UID</th>
@@ -300,6 +319,13 @@ const PlacementDashboard = () => {
           <tbody>
             {filteredStudents.map((s, idx) => (
               <tr key={s.UID}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.includes(s.UID)}
+                    onChange={() => handleStudentSelect(s.UID)}
+                  />
+                </td>
                 <td>{idx + 1}</td>
                 <td>{s.name}</td>
                 <td>{s.UID}</td>
@@ -323,18 +349,8 @@ const PlacementDashboard = () => {
         </table>
       )}
 
-      <h4>Add Placement</h4>
+      <h4>Add Company</h4>
       <div className="row g-2 mb-3">
-        <div className="col-md-3">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Enter UID (optional)"
-            value={studentUIDInput}
-            onChange={(e) => setStudentUIDInput(e.target.value)}
-            disabled={selectedUIDs.length > 0}
-          />
-        </div>
         <div className="col-md-3">
           <select
             className="form-control"
@@ -393,19 +409,26 @@ const PlacementDashboard = () => {
             onChange={(e) => setRole(e.target.value)}
           />
         </div>
-        <div className="col-md-2">
+        <div className="col-md-3">
           <input
             type="text"
             className="form-control"
-            placeholder="Description"
+            placeholder="Job Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
-        <div className="col-md-1">
+        <div className="col-md-2">
           <button className="btn btn-success" onClick={handleAddPlacement}>
-            Add
+            ADD
           </button>
+        </div>
+      </div>
+      <div className="row g-2 mb-3">
+        <div className="col-md-12">
+          <div className="alert alert-info">
+            <strong>Selected Students:</strong> {selectedStudents.length > 0 ? selectedStudents.join(', ') : 'None selected'}
+          </div>
         </div>
       </div>
     </div>
@@ -413,16 +436,3 @@ const PlacementDashboard = () => {
 };
 
 export default PlacementDashboard;
-
-// Example function for applying to a company (ensure UID is sent as a number)
-const applyForCompany = async (uid, companyId) => {
-  try {
-    const response = await axios.post('http://localhost:5000/api/student-placement/apply', {
-      UID: Number(uid), // Always send as number
-      companyId
-    });
-    // handle response
-  } catch (err) {
-    // handle error
-  }
-};
