@@ -31,15 +31,14 @@ const companySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  batch: {
+    type: Number,
+    required: false // Unique batch identifier for multiple entries
+  }
 });
 
-// Create a compound unique index to allow same company with different student groups
-companySchema.index({ 
-  companyName: 1, 
-  role: 1, 
-  department: 1, 
-  studentUIDs: 1 
-}, { unique: true, sparse: true });
+// NO UNIQUE INDEXES - Allow multiple entries for same company with different students
+// This ensures permanent storage of all placement opportunities
 
 // Drop the collection and recreate it to remove any conflicting indexes
 companySchema.pre('save', function() {

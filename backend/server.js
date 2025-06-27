@@ -25,34 +25,8 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
-    console.log("✅ MongoDB connected successfully");
-    
-    // Fix any existing index issues
-    try {
-      const Company = require("./models/Company");
-      await Company.collection.dropIndex("name_1");
-      console.log("✅ Dropped problematic name_1 index");
-    } catch (indexError) {
-      console.log("ℹ️  No problematic index to drop or already dropped");
-    }
-    
-    // Clean up any documents with null names
-    try {
-      const Company = require("./models/Company");
-      const deletedCount = await Company.deleteMany({ 
-        $or: [
-          { name: null }, 
-          { name: { $exists: false } },
-          { companyName: null },
-          { companyName: { $exists: false } }
-        ] 
-      });
-      if (deletedCount.deletedCount > 0) {
-        console.log(`✅ Cleaned up ${deletedCount.deletedCount} invalid company documents`);
-      }
-    } catch (cleanupError) {
-      console.log("ℹ️  No cleanup needed or cleanup failed:", cleanupError.message);
-    }
+    console.log("✅ MongoDB connected successfully - PERMANENT STORAGE MODE");
+    console.log("ℹ️  All data will be stored permanently with no deletion or cleanup");
     
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
