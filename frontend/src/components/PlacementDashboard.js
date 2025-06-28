@@ -19,7 +19,6 @@ const PlacementDashboard = () => {
   const [description, setDescription] = useState("");
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [companies, setCompanies] = useState([]); // List of companies from backend
-  const [companyMap, setCompanyMap] = useState({}); // { companyName: companyId }
   const [applications, setApplications] = useState([]); // Store all applications
   
   // Password change states
@@ -70,11 +69,6 @@ const PlacementDashboard = () => {
         list = res.data;
       }
       setCompanies(list);
-      const map = {};
-      list.forEach((c) => {
-        map[c.companyName] = c._id;
-      });
-      setCompanyMap(map);
     } catch (err) {
       console.error("Error fetching companies:", err);
     }
@@ -268,6 +262,38 @@ const PlacementDashboard = () => {
     }
   };
 
+  const handleDeleteCompany = async (companyId, companyDepartment) => {
+    // Check if coordinator can delete this company (only their own department companies)
+    if (companyDepartment !== coordinator?.department) {
+      alert("You can only delete companies from your department. TPO companies (ALL departments) cannot be deleted by coordinators.");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this company? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`http://localhost:5000/api/companies/${companyId}`, {
+        data: {
+          userDepartment: coordinator?.department,
+          userRole: 'coordinator'
+        }
+      });
+      alert("Company deleted successfully!");
+      
+      // Refresh companies list
+      const companiesRes = await axios.get("http://localhost:5000/api/companies/all");
+      if (Array.isArray(companiesRes.data.data)) {
+        setCompanies(companiesRes.data.data);
+      }
+
+    } catch (err) {
+      console.error("Error deleting company:", err);
+      alert(`Failed to delete company: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
   return (
     <div className="container mt-4 position-relative">
       <div className="d-flex justify-content-end position-absolute" style={{ top: 0, right: 0 }}>
@@ -404,6 +430,61 @@ const PlacementDashboard = () => {
           </tbody>
         </table>
       )}
+
+      {/* Company Management Section */}
+      <div className="card mb-4">
+        <div className="card-header">
+          <h4>Company Management - {coordinator?.department} Department</h4>
+        </div>
+        <div className="card-body">
+          <div className="table-responsive" style={{ maxHeight: "300px", overflowY: "auto" }}>
+            <table className="table table-sm table-bordered">
+              <thead className="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>Company Name</th>
+                  <th>Role</th>
+                  <th>CTC (LPA)</th>
+                  <th>Department</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies
+                  .filter(company => 
+                    company.department === coordinator?.department || 
+                    company.department === 'ALL'
+                  )
+                  .map((company, idx) => (
+                  <tr key={company._id}>
+                    <td>{idx + 1}</td>
+                    <td>{company.companyName}</td>
+                    <td>{company.role}</td>
+                    <td>{company.ctc}</td>
+                    <td>
+                      <span className={`badge ${company.department === 'ALL' ? 'bg-warning text-dark' : 'bg-primary'}`}>
+                        {company.department === 'ALL' ? 'ALL (TPO)' : company.department}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteCompany(company._id, company.department)}
+                        title={company.department === coordinator?.department 
+                          ? "Delete Company" 
+                          : "Cannot delete - Not your department or TPO company"}
+                        disabled={company.department !== coordinator?.department}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       <h4>Add Company</h4>
       <div className="row g-2 mb-3">

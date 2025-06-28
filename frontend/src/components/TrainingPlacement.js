@@ -21,7 +21,6 @@ const TrainingPlacement = () => {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [selectedDepartmentForCompany, setSelectedDepartmentForCompany] = useState("ALL"); // Department for new company
   const [companies, setCompanies] = useState([]); // List of companies
-  const [companyMap, setCompanyMap] = useState({}); // Map companyName -> companyId
   const [applications, setApplications] = useState([]);
 
   // Password change states
@@ -35,18 +34,18 @@ const TrainingPlacement = () => {
   // Fetch coordinator and initial data
   const fetchCoordinatorAndData = async () => {
     const token = localStorage.getItem("token");
-    let coordRaw = localStorage.getItem("coordinator");
-    let coord;
+    let userRaw = localStorage.getItem("user"); // TPO data stored in 'user'
+    let user;
     try {
-      coord = coordRaw ? JSON.parse(coordRaw) : null;
+      user = userRaw ? JSON.parse(userRaw) : null;
     } catch {
-      coord = null;
+      user = null;
     }
-    if (!coord || !token) {
+    if (!user || !token) {
       window.location.href = "/";
       return;
     }
-    setCoordinator(coord);
+    setCoordinator(user); // Setting TPO data as coordinator
 
     try {
       // TPO fetches all students from all departments
@@ -76,11 +75,6 @@ const TrainingPlacement = () => {
         list = res.data;
       }
       setCompanies(list);
-      const map = {};
-      list.forEach((c) => {
-        map[c.companyName] = c._id;
-      });
-      setCompanyMap(map);
     } catch (err) {
       console.error("Error fetching companies:", err);
     }
@@ -161,6 +155,30 @@ const TrainingPlacement = () => {
     }
   };
 
+  // Handle deleting a company
+  const handleDeleteCompany = async (companyId) => {
+    if (!window.confirm("Are you sure you want to delete this company? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`http://localhost:5000/api/companies/${companyId}`, {
+        data: {
+          userDepartment: 'ALL', // TPO can access all departments
+          userRole: 'tpo'
+        }
+      });
+      alert("Company deleted successfully!");
+      
+      // Refresh companies list
+      await fetchCompanies();
+
+    } catch (err) {
+      console.error("Error deleting company:", err);
+      alert(`Failed to delete company: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
   // Export students to Excel
   const handleDownloadExcel = () => {
     const exportData = studentPlacements.map((s, idx) => ({
@@ -179,6 +197,26 @@ const TrainingPlacement = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Placements");
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "placements.xlsx");
+  };
+
+  // Export companies to Excel
+  const handleDownloadCompaniesExcel = () => {
+    const exportData = companies.map((c, idx) => ({
+      "#": idx + 1,
+      "Company Name": c.companyName,
+      "Role": c.role,
+      "CTC (LPA)": c.ctc,
+      "Department": c.department,
+      "Description": c.description,
+      "Created Date": new Date(c.createdAt).toLocaleDateString()
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Companies");
+
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "companies.xlsx");
   };
 
   // Toggle student selection
@@ -294,7 +332,7 @@ const TrainingPlacement = () => {
           className="btn btn-danger"
           onClick={() => {
             localStorage.removeItem("token");
-            localStorage.removeItem("coordinator");
+            localStorage.removeItem("user"); // Clear TPO user data
             window.location.href = "/";
           }}
         >
@@ -367,6 +405,9 @@ const TrainingPlacement = () => {
           <button className="btn btn-outline-success me-2" onClick={handleDownloadExcel}>
             Download Excel
           </button>
+          <button className="btn btn-outline-success" onClick={handleDownloadCompaniesExcel}>
+            Download Companies Excel
+          </button>
         </div>
       </div>
 
@@ -431,6 +472,61 @@ const TrainingPlacement = () => {
           </tbody>
         </table>
       )}
+
+      {/* Company Management Section */}
+      <div className="card mb-4">
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <h4 className="mb-0">Company Management - All Departments (TPO Access)</h4>
+          <button className="btn btn-outline-success btn-sm" onClick={handleDownloadCompaniesExcel}>
+            Export Companies
+          </button>
+        </div>
+        <div className="card-body">
+          <div className="table-responsive" style={{ maxHeight: "300px", overflowY: "auto" }}>
+            <table className="table table-sm table-bordered">
+              <thead className="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>Company Name</th>
+                  <th>Role</th>
+                  <th>CTC (LPA)</th>
+                  <th>Department</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((company, idx) => (
+                  <tr key={company._id}>
+                    <td>{idx + 1}</td>
+                    <td>{company.companyName}</td>
+                    <td>{company.role}</td>
+                    <td>{company.ctc}</td>
+                    <td>
+                      <span className={`badge ${company.department === 'ALL' ? 'bg-primary' : 'bg-secondary'}`}>
+                        {company.department}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteCompany(company._id)}
+                        title="Delete Company"
+                      >
+                        <i className="fas fa-trash"></i> Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {companies.length === 0 && (
+              <div className="text-center text-muted p-3">
+                No companies added yet.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Add Company Form */}
       <h4>Add Company</h4>

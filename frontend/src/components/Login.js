@@ -158,12 +158,13 @@ const LoginForm = ({
       ) : (
         <>
           <div className="form-group mb-2">
-            <label>User ID</label>
+            <label>UID</label>
             <input
               type="text"
               className="form-control"
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
+              placeholder="Enter UID (1111)"
             />
           </div>
           <div className="form-group mb-2 position-relative">
@@ -173,6 +174,7 @@ const LoginForm = ({
               className="form-control"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
             />
             <span
               style={{ position: 'absolute', right: 12, top: 38, cursor: 'pointer' }}

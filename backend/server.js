@@ -10,6 +10,10 @@ const studentPlacementRoutes = require("./routes/studentPlacementRoutes");
 const coordinatorRoutes = require("./routes/coordinatorRoutes");
 const tpoRoutes = require("./routes/tpoRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
+const adminLoginRoutes = require("./routes/adminLoginRoutes");
+
+// Import admin initialization
+const { initializeDefaultAdmin } = require("./controllers/adminLoginController");
 
 dotenv.config();
 
@@ -26,7 +30,10 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
-    console.log("✅ MongoDB connected successfully - PERMANENT STORAGE MODE");
+    console.log("✅ MongoDB connected successfully");
+    
+    // Initialize default admin after DB connection
+    await initializeDefaultAdmin();
     
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
@@ -47,6 +54,7 @@ app.use("/api/coordinators", coordinatorRoutes);
 app.use("/api/tpos", tpoRoutes);
 app.use("/api/student-placement", studentPlacementRoutes);
 app.use("/api/applications", applicationRoutes);
+app.use("/api/admin", adminLoginRoutes);
 
 // Default route
 app.get("/", (req, res) => {

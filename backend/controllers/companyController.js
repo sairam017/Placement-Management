@@ -186,3 +186,51 @@ exports.getDatabaseStats = async (req, res) => {
     });
   }
 };
+
+// ✅ Delete company (for TPO and Placement Officers with department restrictions)
+exports.deleteCompany = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userDepartment, userRole } = req.body; // userRole: 'tpo' or 'coordinator'
+    
+    if (!id) {
+      return res.status(400).json({ message: "Company ID is required" });
+    }
+
+    const company = await Company.findById(id);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
+    // Access control based on user role and department
+    if (userRole === 'coordinator') {
+      // Placement coordinators can only delete companies from their department
+      if (company.department !== userDepartment && company.department !== 'ALL') {
+        return res.status(403).json({ 
+          message: "Access denied. You can only delete companies from your department." 
+        });
+      }
+    }
+    // TPOs (userRole === 'tpo') can delete companies from any department
+
+    // Remove the company from database
+    await Company.findByIdAndDelete(id);
+
+    // Also remove applications for this company from student placements
+    await StudentPlacement.updateMany(
+      { "applications.companyId": id },
+      { $pull: { applications: { companyId: id } } }
+    );
+
+    return res.status(200).json({
+      message: "Company deleted successfully",
+      deletedCompany: company.companyName
+    });
+
+  } catch (error) {
+    console.error("Error deleting company:", error);
+    return res.status(500).json({
+      message: "Failed to delete company: " + error.message
+    });
+  }
+};

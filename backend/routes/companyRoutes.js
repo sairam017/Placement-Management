@@ -34,7 +34,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// PERMANENT STORAGE ONLY - NO UPDATE/DELETE ROUTES
-// All company data is stored permanently and cannot be modified or deleted
+// DELETE /api/companies/:id - Delete company (for TPO and Placement Officers)
+router.delete("/:id", companyController.deleteCompany);
 
 module.exports = router;
