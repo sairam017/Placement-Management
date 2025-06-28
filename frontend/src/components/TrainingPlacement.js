@@ -1,105 +1,626 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // Import Axios for API calls
-import './TrainingPlacement.css';
+import React, { useEffect, useState, useCallback } from "react";
+import axios from "axios";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import './TrainingPlacement.css'; // Ensure you have this CSS file
 
 const TrainingPlacement = () => {
-  const [departments, setDepartments] = useState([]);
-  const [newDept, setNewDept] = useState('');
-  const [selectedDept, setSelectedDept] = useState('');
-  const [studentData, setStudentData] = useState({});
+  const [studentPlacements, setStudentPlacements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [coordinator, setCoordinator] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [filterCompany, setFilterCompany] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState(""); // Add department filter for TPO
+  const [filterSection, setFilterSection] = useState(""); // Add section filter
+  const [companyName, setCompanyName] = useState("");
+  const [customCompanyName, setCustomCompanyName] = useState("");
+  const [packageCTC, setPackageCTC] = useState("");
+  const [role, setRole] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectedDepartmentForCompany, setSelectedDepartmentForCompany] = useState("ALL"); // Department for new company
+  const [companies, setCompanies] = useState([]); // List of companies
+  const [companyMap, setCompanyMap] = useState({}); // Map companyName -> companyId
+  const [applications, setApplications] = useState([]);
 
-  // Fetch departments from API
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/api/departments'); // Replace with your API endpoint
-        setDepartments(response.data);
-        if (response.data.length > 0) {
-          setSelectedDept(response.data[0]); // Set the first department as default
-        }
-      } catch (error) {
-        console.error("Error fetching departments:", error);
+  // Password change states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Fetch coordinator and initial data
+  const fetchCoordinatorAndData = async () => {
+    const token = localStorage.getItem("token");
+    let coordRaw = localStorage.getItem("coordinator");
+    let coord;
+    try {
+      coord = coordRaw ? JSON.parse(coordRaw) : null;
+    } catch {
+      coord = null;
+    }
+    if (!coord || !token) {
+      window.location.href = "/";
+      return;
+    }
+    setCoordinator(coord);
+
+    try {
+      // TPO fetches all students from all departments
+      const res = await axios.get(
+        `http://localhost:5000/api/student-placement/all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = Array.isArray(res.data.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+      setStudentPlacements(data);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to load data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch all companies
+  const fetchCompanies = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/companies/all");
+      console.log("Companies response:", res.data);
+      let list = [];
+      if (Array.isArray(res.data.data)) {
+        list = res.data.data;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
       }
-    };
+      setCompanies(list);
+      const map = {};
+      list.forEach((c) => {
+        map[c.companyName] = c._id;
+      });
+      setCompanyMap(map);
+    } catch (err) {
+      console.error("Error fetching companies:", err);
+    }
+  };
 
-    fetchDepartments();
+  // Fetch all applications for TPO
+  const fetchDepartmentApplications = useCallback(async () => {
+    try {
+      // TPO fetches all applications from all departments
+      const res = await axios.get(`http://localhost:5000/api/applications/all`);
+      if (res.data.success) {
+        setApplications(res.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+    }
   }, []);
 
-  // Fetch student data for the selected department
+  // Load initial data
   useEffect(() => {
-    const fetchStudentData = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/api/students/${selectedDept}`); // Replace with your API endpoint
-        setStudentData(response.data);
-      } catch (error) {
-        console.error("Error fetching student data:", error);
-      }
-    };
+    fetchCompanies();
+  }, []);
 
-    if (selectedDept) {
-      fetchStudentData();
+  useEffect(() => {
+    fetchCoordinatorAndData();
+    fetchDepartmentApplications();
+  }, [fetchDepartmentApplications]);
+
+  useEffect(() => {
+    if (filterCompany) {
+      setFilter('all');
     }
-  }, [selectedDept]);
+  }, [filterCompany]);
 
-  // Handle adding a new department
-  const handleAddDepartment = () => {
-    const dept = newDept.toUpperCase().trim();
-    if (dept && !departments.includes(dept)) {
-      setDepartments([...departments, dept]);
-      setNewDept('');
+  useEffect(() => {
+    if (filterDepartment || filterSection) {
+      setFilter('all');
+    }
+  }, [filterDepartment, filterSection]);
+
+  // Handle adding placement/company
+  const handleAddPlacement = async () => {
+    const finalCompanyName = companyName === "Others" ? customCompanyName : companyName;
+    if (!finalCompanyName || !packageCTC || !role || !description) {
+      alert("Please fill all required fields (Company Name, CTC, Role, Description).");
+      return;
+    }
+    if (companyName === "Others" && !customCompanyName.trim()) {
+      alert("Please enter a custom company name.");
+      return;
+    }
+
+    try {
+      const payload = {
+        companyName: finalCompanyName,
+        ctc: parseFloat(packageCTC),
+        role,
+        description,
+        department: selectedDepartmentForCompany, // Use selected department
+        studentUIDs: selectedStudents
+      };
+      console.log("Sending payload:", payload);
+      const response = await axios.post(`http://localhost:5000/api/companies`, payload);
+      console.log("Response:", response.data);
+      alert("Company added successfully!");
+      setCompanyName("");
+      setCustomCompanyName("");
+      setPackageCTC("");
+      setRole("");
+      setDescription("");
+      setSelectedStudents([]);
+      setSelectedDepartmentForCompany("ALL"); // Reset to default
+      await fetchCompanies(); // Refresh company list
+    } catch (err) {
+      console.error("Error adding company:", err);
+      console.error("Error response:", err.response?.data);
+      alert(`Failed to add company: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
+  // Export students to Excel
+  const handleDownloadExcel = () => {
+    const exportData = studentPlacements.map((s, idx) => ({
+      "#": idx + 1,
+      Name: s.name,
+      UID: s.UID,
+      Department: s.department,
+      Section: s.section,
+      MailID: s.mailid,
+      Mobile: s.mobile,
+      Relocate: s.relocate ? "Yes" : "No",
+      ResumeURL: s.resumeUrl ? `http://localhost:5000${s.resumeUrl}` : "-"
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Placements");
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "placements.xlsx");
+  };
+
+  // Toggle student selection
+  const handleStudentSelect = (uid) => {
+    setSelectedStudents(prev => {
+      if (prev.includes(uid)) {
+        return prev.filter(id => id !== uid);
+      } else {
+        return [...prev, uid];
+      }
+    });
+  };
+
+  const handleSelectAllStudents = () => {
+    if (selectedStudents.length === filteredStudents.length && filteredStudents.length > 0) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents.map(s => s.UID));
+    }
+  };
+
+  // Check application status
+  const hasStudentAppliedToCompany = (studentUID, companyName) => {
+    return applications.some(app =>
+      app.studentUID === studentUID.toString() && app.companyName === companyName
+    );
+  };
+
+  const hasStudentAnyApplication = (studentUID) => {
+    return applications.some(app => app.studentUID === studentUID.toString());
+  };
+
+  // Filter students
+  const getFilteredStudents = () => {
+    let filteredByDepartment = studentPlacements;
+    
+    // Filter by department first (for TPO)
+    if (filterDepartment) {
+      filteredByDepartment = studentPlacements.filter(s => s.department === filterDepartment);
+    }
+    
+    // Filter by section
+    let filteredBySection = filteredByDepartment;
+    if (filterSection) {
+      filteredBySection = filteredByDepartment.filter(s => s.section === filterSection);
+    }
+    
+    // Then filter by company and application status
+    if (filterCompany) {
+      if (filter === "applied") {
+        return filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
+      } else if (filter === "not_applied") {
+        return filteredBySection.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
+      } else {
+        return filteredBySection;
+      }
+    } else {
+      if (filter === "applied") {
+        return filteredBySection.filter((s) => hasStudentAnyApplication(s.UID));
+      } else if (filter === "not_applied") {
+        return filteredBySection.filter((s) => !hasStudentAnyApplication(s.UID));
+      } else {
+        return filteredBySection;
+      }
+    }
+  };
+
+  const filteredStudents = getFilteredStudents();
+
+  // Change password handler
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      alert("Please fill all password fields.");
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("New password and confirm password don't match.");
+      return;
+    }
+    if (passwordData.newPassword.length < 4) {
+      alert("New password must be at least 4 characters long.");
+      return;
+    }
+    try {
+      const response = await axios.put('http://localhost:5000/api/tpos/change-password', {
+        employeeId: coordinator.employeeId,
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      alert("Password changed successfully!");
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      console.error("Error changing password:", err);
+      alert(`Failed to change password: ${err.response?.data?.message || err.message}`);
     }
   };
 
   return (
-    <div className="tp-container">
-      <h2 className="tp-title">Welcome Training and Placement Department</h2>
+    <div className="container mt-4 position-relative">
+      <div className="d-flex justify-content-end position-absolute" style={{ top: 0, right: 0 }}>
+        <button
+          className="btn btn-warning me-2"
+          onClick={() => setShowPasswordModal(true)}
+        >
+          Change Password
+        </button>
+        <button
+          className="btn btn-danger"
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("coordinator");
+            window.location.href = "/";
+          }}
+        >
+          Logout
+        </button>
+      </div>
 
-      <div className="tp-panel">
-        <div className="tp-left">
-          <label className="tp-label">Select Department:</label>
+      <h2>Welcome, {coordinator?.name} (Training Placement Officer)</h2>
+      <p><strong>Employee ID:</strong> {coordinator?.employeeId}</p>
+
+      {/* Filters and Actions */}
+      <div className="d-flex justify-content-between mb-3 align-items-center">
+        <div className="d-flex align-items-center">
           <select
-            className="tp-dropdown"
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
+            className="form-select form-select-sm me-2"
+            style={{ width: 200 }}
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
           >
-            {departments.map((dept, index) => (
-              <option key={index} value={dept}>{dept}</option>
+            <option value="">-- All Departments --</option>
+            {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
+              <option key={dept} value={dept}>{dept}</option>
             ))}
           </select>
+          <select
+            className="form-select form-select-sm me-2"
+            style={{ width: 180 }}
+            value={filterSection}
+            onChange={(e) => setFilterSection(e.target.value)}
+          >
+            <option value="">-- All Sections --</option>
+            {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+              <option key={section} value={section}>{section}</option>
+            ))}
+          </select>
+          <select
+            className="form-select form-select-sm me-2"
+            style={{ width: 220 }}
+            value={filterCompany}
+            onChange={(e) => setFilterCompany(e.target.value)}
+          >
+            <option value="">-- Filter by Company --</option>
+            {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
+              <option key={companyName} value={companyName}>{companyName}</option>
+            ))}
+          </select>
+          <button
+            className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
+            onClick={() => setFilter("all")}
+            type="button"
+          >
+            All Students
+          </button>
+          <button
+            className={`btn btn-sm ${filter === 'applied' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
+            onClick={() => setFilter("applied")}
+            type="button"
+          >
+            Applied
+          </button>
+          <button
+            className={`btn btn-sm ${filter === 'not_applied' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setFilter("not_applied")}
+            type="button"
+          >
+            Not Applied
+          </button>
+        </div>
+        <div className="d-flex align-items-center">
+          <button className="btn btn-outline-success me-2" onClick={handleDownloadExcel}>
+            Download Excel
+          </button>
+        </div>
+      </div>
 
-          <div className="add-dept-form">
+      {/* Student Table */}
+      {loading ? (
+        <p>Loading...</p>
+      ) : error ? (
+        <p className="text-danger">{error}</p>
+      ) : (
+        <table className="table table-bordered">
+          <thead>
+            <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                  onChange={handleSelectAllStudents}
+                />
+              </th>
+              <th>#</th>
+              <th>Name</th>
+              <th>UID</th>
+              <th>Department</th>
+              <th>Section</th>
+              <th>Mail</th>
+              <th>Mobile</th>
+              <th>Relocate</th>
+              <th>Resume</th>
+              <th>Applied</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStudents.map((s, idx) => (
+              <tr key={s.UID}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.includes(s.UID)}
+                    onChange={() => handleStudentSelect(s.UID)}
+                  />
+                </td>
+                <td>{idx + 1}</td>
+                <td>{s.name}</td>
+                <td>{s.UID}</td>
+                <td>{s.department}</td>
+                <td>{s.section}</td>
+                <td>{s.mailid}</td>
+                <td>{s.mobile}</td>
+                <td>{s.relocate ? "Yes" : "No"}</td>
+                <td>
+                  {s.resumeUrl ? (
+                    <a href={`http://localhost:5000${s.resumeUrl}`} target="_blank" rel="noopener noreferrer">View</a>
+                  ) : "-"}
+                </td>
+                <td>
+                  {filterCompany
+                    ? hasStudentAppliedToCompany(s.UID, filterCompany) ? "Yes" : "No"
+                    : hasStudentAnyApplication(s.UID) ? "Yes" : "No"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {/* Add Company Form */}
+      <h4>Add Company</h4>
+      <div className="row g-2 mb-3">
+        <div className="col-md-3">
+          <select
+            className="form-control"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+          >
+            <option value="">Select Company</option>
+            <optgroup label="MNC Companies">
+              <option value="Google India">Google India</option>
+              <option value="Microsoft India">Microsoft India</option>
+              <option value="Amazon India">Amazon India</option>
+              <option value="IBM India">IBM India</option>
+              <option value="Accenture India">Accenture India</option>
+              <option value="TCS (Tata Consultancy Services)">TCS</option>
+              <option value="Infosys">Infosys</option>
+              <option value="Wipro">Wipro</option>
+              <option value="Capgemini India">Capgemini</option>
+              <option value="Cognizant Technology Solutions India">Cognizant</option>
+            </optgroup>
+            <optgroup label="Startup Companies">
+              <option value="Zerodha">Zerodha</option>
+              <option value="CRED">CRED</option>
+              <option value="Swiggy">Swiggy</option>
+              <option value="Zomato">Zomato</option>
+              <option value="BYJU’S">BYJU'S</option>
+              <option value="Unacademy">Unacademy</option>
+              <option value="Razorpay">Razorpay</option>
+              <option value="PhonePe">PhonePe</option>
+              <option value="Groww">Groww</option>
+              <option value="Meesho">Meesho</option>
+              <option value="Delhivery">Delhivery</option>
+              <option value="Nykaa">Nykaa</option>
+              <option value="OYO Rooms">OYO Rooms</option>
+              <option value="Boat">Boat</option>
+              <option value="Udaan">Udaan</option>
+              <option value="Others">Others</option>
+            </optgroup>
+          </select>
+        </div>
+        {companyName === "Others" && (
+          <div className="col-md-3">
             <input
               type="text"
-              placeholder="Add Department"
-              value={newDept}
-              onChange={(e) => setNewDept(e.target.value)}
-              className="dept-input"
+              className="form-control"
+              placeholder="Enter Company Name"
+              value={customCompanyName}
+              onChange={(e) => setCustomCompanyName(e.target.value)}
             />
-            <button onClick={handleAddDepartment} className="add-btn">Add</button>
           </div>
+        )}
+        <div className="col-md-2">
+          <input
+            type="number"
+            step="0.1"
+            className="form-control"
+            placeholder="CTC (LPA)"
+            value={packageCTC}
+            onChange={(e) => setPackageCTC(e.target.value)}
+          />
         </div>
+        <div className="col-md-2">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          />
+        </div>
+        <div className="col-md-3">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Job Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+        <div className="col-md-2">
+          <button className="btn btn-success" onClick={handleAddPlacement}>ADD</button>
+        </div>
+      </div>
 
-        <div className="tp-right">
-          <h3 className="dept-heading">Department Selected: {selectedDept}</h3>
-
-          <div className="student-section">
-            <h4>Students Info:</h4>
-            <div className="student-list">
-              {studentData[selectedDept] ? (
-                studentData[selectedDept].map((student, index) => (
-                  <div key={index} className="student-card">
-                    <p><strong>Name:</strong> {student.name}</p>
-                    <p><strong>UID:</strong> {student.uid}</p>
-                    <p><strong>Section:</strong> {student.section}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="no-data">No student data available for this department.</p>
-              )}
-            </div>
+      <div className="row g-2 mb-3">
+        <div className="col-md-4">
+          <label className="form-label">Target Department:</label>
+          <select
+            className="form-control"
+            value={selectedDepartmentForCompany}
+            onChange={(e) => setSelectedDepartmentForCompany(e.target.value)}
+          >
+            <option value="ALL">ALL Departments</option>
+            {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-md-8">
+          <div className="alert alert-info">
+            <strong>Selected Students:</strong> {selectedStudents.length > 0 ? selectedStudents.join(', ') : 'None selected'}
           </div>
         </div>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Change Password</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label htmlFor="currentPassword" className="form-label">Current Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="currentPassword"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="newPassword" className="form-label">New Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="newPassword"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                    placeholder="Enter new password (min 4 chars)"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="confirmPassword" className="form-label">Confirm New Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    id="confirmPassword"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleChangePassword}
+                >
+                  Change Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

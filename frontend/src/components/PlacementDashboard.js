@@ -11,6 +11,7 @@ const PlacementDashboard = () => {
   const [coordinator, setCoordinator] = useState(null);
   const [filter, setFilter] = useState("all");
   const [filterCompany, setFilterCompany] = useState("");
+  const [filterSection, setFilterSection] = useState(""); // Add section filter
   const [companyName, setCompanyName] = useState("");
   const [customCompanyName, setCustomCompanyName] = useState("");
   const [packageCTC, setPackageCTC] = useState("");
@@ -106,6 +107,12 @@ const PlacementDashboard = () => {
     }
   }, [filterCompany]);
 
+  useEffect(() => {
+    if (filterSection) {
+      setFilter('all');
+    }
+  }, [filterSection]);
+
   const handleAddPlacement = async () => {
     const finalCompanyName = companyName === "Others" ? customCompanyName : companyName;
     
@@ -196,21 +203,29 @@ const PlacementDashboard = () => {
   };
 
   const getFilteredStudents = () => {
+    let filteredBySection = studentPlacements;
+    
+    // Filter by section first
+    if (filterSection) {
+      filteredBySection = studentPlacements.filter(s => s.section === filterSection);
+    }
+    
+    // Then filter by company and application status
     if (filterCompany) {
       if (filter === "applied") {
-        return studentPlacements.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
+        return filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
       } else if (filter === "not_applied") {
-        return studentPlacements.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
+        return filteredBySection.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
       } else {
-        return studentPlacements;
+        return filteredBySection;
       }
     } else {
       if (filter === "applied") {
-        return studentPlacements.filter((s) => hasStudentAnyApplication(s.UID));
+        return filteredBySection.filter((s) => hasStudentAnyApplication(s.UID));
       } else if (filter === "not_applied") {
-        return studentPlacements.filter((s) => !hasStudentAnyApplication(s.UID));
+        return filteredBySection.filter((s) => !hasStudentAnyApplication(s.UID));
       } else {
-        return studentPlacements;
+        return filteredBySection;
       }
     }
   };
@@ -278,6 +293,18 @@ const PlacementDashboard = () => {
 
       <div className="d-flex justify-content-between mb-3 align-items-center">
         <div className="d-flex align-items-center">
+          {/* Section Filter Dropdown */}
+          <select
+            className="form-select form-select-sm me-2"
+            style={{ width: 180, display: "inline-block" }}
+            value={filterSection}
+            onChange={(e) => setFilterSection(e.target.value)}
+          >
+            <option value="">-- All Sections --</option>
+            {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+              <option key={section} value={section}>{section}</option>
+            ))}
+          </select>
           {/* Company Filter Dropdown */}
           <select
             className="form-select form-select-sm me-2"

@@ -61,9 +61,14 @@ const LandingPage = () => {
         localStorage.setItem('token', response.data.token);
         if (userType === 'placement-coordinator') {
           localStorage.setItem('coordinator', JSON.stringify(response.data.user));
+        } else if (userType === 'training-placement-officer') {
+          // Training placement officers also need coordinator data for TrainingPlacement.js
+          localStorage.setItem('coordinator', JSON.stringify(response.data.data));
         }
         // Fix: For student, store response.data.data as 'user'
         if (userType === 'student') {
+          localStorage.setItem('user', JSON.stringify(response.data.data));
+        } else if (userType === 'training-placement-officer') {
           localStorage.setItem('user', JSON.stringify(response.data.data));
         } else {
           localStorage.setItem('user', JSON.stringify(response.data.user));

@@ -54,7 +54,15 @@ exports.addCompany = async (req, res) => {
 exports.getCompaniesByDepartment = async (req, res) => {
   try {
     const dept = req.query.department;
-    const companies = await Company.find({ department: dept });
+    
+    // Find companies for the specific department OR for "ALL" departments (added by TPO)
+    const companies = await Company.find({ 
+      $or: [
+        { department: dept },
+        { department: "ALL" }
+      ]
+    });
+    
     res.json({ data: companies });
   } catch (error) {
     console.error("Error fetching companies by department:", error);

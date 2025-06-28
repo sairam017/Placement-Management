@@ -8,7 +8,6 @@ const StudentDashboard = () => {
   const [companies, setCompanies] = useState([]);
   const [appliedCompanies, setAppliedCompanies] = useState([]);
   const [showOnlyApplied, setShowOnlyApplied] = useState(false);
-  const [showPendingOnly, setShowPendingOnly] = useState(false);
 
   const navigate = useNavigate();
 
@@ -35,6 +34,8 @@ const StudentDashboard = () => {
       if (!student.department || !student.UID) return;
 
       try {
+        console.log("Fetching data for student:", student.UID, "department:", student.department);
+        
         const [companiesRes, applicationsRes] = await Promise.all([
           axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`),
           axios.get(`http://localhost:5000/api/applications/student/${student.UID}`)
@@ -43,8 +44,21 @@ const StudentDashboard = () => {
         const companiesData = companiesRes.data?.data || [];
         const applications = applicationsRes.data?.data || [];
 
+        console.log("Companies fetched:", companiesData);
+        console.log("Applications fetched:", applications);
+
         setCompanies(companiesData);
-        setAppliedCompanies(applications.map(app => app.companyId || app.companyName));
+        
+        // Extract company IDs from applications - handle different response structures
+        const appliedCompanyIds = applications.map(app => {
+          if (typeof app.companyId === 'object' && app.companyId._id) {
+            return app.companyId._id;
+          }
+          return app.companyId;
+        });
+        
+        console.log("Applied company IDs:", appliedCompanyIds);
+        setAppliedCompanies(appliedCompanyIds);
       } catch (err) {
         console.error("Error fetching data:", err);
       }
@@ -55,32 +69,75 @@ const StudentDashboard = () => {
 
   const handleApply = async (company) => {
     try {
+      console.log("Applying to company:", company._id, "for student:", student.UID);
+      
       const response = await axios.post(`http://localhost:5000/api/applications/apply`, {
         studentUID: student.UID,
         companyId: company._id
       });
 
+      console.log("Application response:", response.data);
+
       if (response.data.success) {
         alert("Applied successfully!");
-        setAppliedCompanies(prev => [...prev, company._id, company.companyName]);
+        // Update the applied companies list
+        setAppliedCompanies(prev => [...prev, company._id]);
       }
     } catch (err) {
+      console.error("Apply error:", err);
+      console.error("Error response:", err.response?.data);
+      
       if (err.response?.status === 400) {
         alert("You have already applied to this company.");
+        // If already applied, add to the state to reflect the current status
+        setAppliedCompanies(prev => {
+          if (!prev.includes(company._id)) {
+            return [...prev, company._id];
+          }
+          return prev;
+        });
       } else {
         alert("Failed to apply. Please try again.");
       }
-      console.error("Apply error:", err);
     }
   };
 
-  const hasAppliedToCompany = (company) => 
-    appliedCompanies.includes(company._id) || appliedCompanies.includes(company.companyName);
+  const hasAppliedToCompany = (companyId) => appliedCompanies.includes(companyId);
+
+  // Function to refresh data
+  const refreshData = async () => {
+    if (!student.department || !student.UID) return;
+    
+    try {
+      console.log("Refreshing data...");
+      
+      const [companiesRes, applicationsRes] = await Promise.all([
+        axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`),
+        axios.get(`http://localhost:5000/api/applications/student/${student.UID}`)
+      ]);
+
+      const companiesData = companiesRes.data?.data || [];
+      const applications = applicationsRes.data?.data || [];
+
+      setCompanies(companiesData);
+      
+      const appliedCompanyIds = applications.map(app => {
+        if (typeof app.companyId === 'object' && app.companyId._id) {
+          return app.companyId._id;
+        }
+        return app.companyId;
+      });
+      
+      setAppliedCompanies(appliedCompanyIds);
+      alert("Data refreshed successfully!");
+    } catch (err) {
+      console.error("Error refreshing data:", err);
+      alert("Failed to refresh data.");
+    }
+  };
 
   const filteredCompanies = showOnlyApplied
-    ? companies.filter((c) => hasAppliedToCompany(c))
-    : showPendingOnly
-    ? companies.filter((c) => !hasAppliedToCompany(c))
+    ? companies.filter((c) => hasAppliedToCompany(c._id))
     : companies;
 
   return (
@@ -100,13 +157,6 @@ const StudentDashboard = () => {
 
       {/* Student Info */}
       <div className="profile-section">
-        {/* Scrolling Text */}
-        <div className="scrolling-text-container">
-          <div className="scrolling-text">
-            Registered students only access the links please Register
-          </div>
-        </div>
-        
         <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
         <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
         <p><strong>Section:</strong> {student.section || <span style={{ color: 'red' }}>No Section</span>}</p>
@@ -121,51 +171,33 @@ const StudentDashboard = () => {
       {/* Filter Buttons */}
       <div className="filter-buttons">
         <button
-          className={!showOnlyApplied && !showPendingOnly ? 'active' : ''}
-          onClick={() => {
-            setShowOnlyApplied(false);
-            setShowPendingOnly(false);
-          }}
+          className={!showOnlyApplied ? 'active' : ''}
+          onClick={() => setShowOnlyApplied(false)}
         >
           All Companies
         </button>
         <button
-          className={showPendingOnly ? 'active' : ''}
-          onClick={() => {
-            setShowPendingOnly(true);
-            setShowOnlyApplied(false);
-          }}
-        >
-          Pending Companies
-        </button>
-        <button
           className={showOnlyApplied ? 'active' : ''}
-          onClick={() => {
-            setShowOnlyApplied(true);
-            setShowPendingOnly(false);
-          }}
+          onClick={() => setShowOnlyApplied(true)}
         >
           Applied Companies
         </button>
       </div>
 
+      {/* Info Section */}
+      <div className="info-section">
+        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+          <strong>Company Sources:</strong> 
+          <span className="badge bg-primary ms-2 me-2">Training Placement Officer</span>
+          <span className="badge bg-success">Placement Coordinator</span>
+        </p>
+      </div>
+
       {/* Companies Table */}
       <div className="companies-table-section">
-        <h3>
-          {showOnlyApplied 
-            ? "Applied Companies" 
-            : showPendingOnly 
-            ? "Pending Companies" 
-            : "On-going Companies"}
-        </h3>
+        <h3>{showOnlyApplied ? "Applied Companies" : "On-going Companies"}</h3>
         {filteredCompanies.length === 0 ? (
-          <p>
-            {showOnlyApplied 
-              ? "No applied companies." 
-              : showPendingOnly 
-              ? "No pending companies." 
-              : "No companies available."}
-          </p>
+          <p>{showOnlyApplied ? "No applied companies." : "No companies available."}</p>
         ) : (
           <table className="companies-table">
             <thead>
@@ -174,6 +206,7 @@ const StudentDashboard = () => {
                 <th>Role</th>
                 <th>CTC (LPA)</th>
                 <th>Description</th>
+                <th>Added By</th>
                 <th>Status / Action</th>
               </tr>
             </thead>
@@ -185,11 +218,16 @@ const StudentDashboard = () => {
                   <td>{comp.ctc}</td>
                   <td>{comp.description}</td>
                   <td>
-                    {hasAppliedToCompany(comp) ? (
+                    <span className={`badge ${comp.department === 'ALL' ? 'bg-primary' : 'bg-success'}`}>
+                      {comp.department === 'ALL' ? 'Training Placement Officer' : 'Placement Coordinator'}
+                    </span>
+                  </td>
+                  <td>
+                    {hasAppliedToCompany(comp._id) ? (
                       <span className="applied-status">✓ Applied</span>
                     ) : (
                       <button className="apply-button" onClick={() => handleApply(comp)}>
-                        Apply
+                        Applied
                       </button>
                     )}
                   </td>
