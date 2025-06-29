@@ -14,6 +14,9 @@ router.get("/database-stats", companyController.getDatabaseStats);
 // GET /api/companies/opportunities?department=XYZ - Get companies by department
 router.get("/opportunities", companyController.getCompaniesByDepartment);
 
+// GET /api/companies/student/:studentUID - Get companies accessible to a specific student
+router.get("/student/:studentUID", companyController.getCompaniesByStudentUID);
+
 // GET /api/companies/all - Get all companies
 router.get("/all", companyController.getAllCompanies);
 

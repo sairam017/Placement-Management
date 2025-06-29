@@ -8,6 +8,7 @@ const StudentDashboard = () => {
   const [companies, setCompanies] = useState([]);
   const [appliedCompanies, setAppliedCompanies] = useState([]);
   const [showOnlyApplied, setShowOnlyApplied] = useState(false);
+  const [isApplying, setIsApplying] = useState(null); // Track which company is being applied to
   
   // Update modal states
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -48,48 +49,62 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!student.department || !student.UID) return;
+      if (!student.UID) return;
 
       try {
-        console.log("Fetching data for student:", student.UID, "department:", student.department);
+        console.log("Fetching data for student UID:", student.UID);
         
         const [companiesRes, applicationsRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`),
-          axios.get(`http://localhost:5000/api/applications/student/${student.UID}`)
+          axios.get(`http://localhost:5000/api/companies/student/${String(student.UID)}`),
+          axios.get(`http://localhost:5000/api/applications/student/${String(student.UID)}`)
         ]);
 
         const companiesData = companiesRes.data?.data || [];
         const applications = applicationsRes.data?.data || [];
 
-        console.log("Companies fetched:", companiesData);
-        console.log("Applications fetched:", applications);
+        console.log("Companies accessible to UID", student.UID, ":", companiesData.length, "companies");
+        console.log("Applications fetched:", applications.length, "applications");
+        console.log("Student UID being used:", String(student.UID));
 
         setCompanies(companiesData);
         
         // Extract company IDs from applications - handle different response structures
         const appliedCompanyIds = applications.map(app => {
-          if (typeof app.companyId === 'object' && app.companyId._id) {
-            return app.companyId._id;
+          console.log("Processing application:", app);
+          let companyId = null;
+          
+          if (typeof app.companyId === 'object' && app.companyId && app.companyId._id) {
+            companyId = app.companyId._id;
+          } else if (app.companyId) {
+            companyId = app.companyId;
           }
-          return app.companyId;
-        });
+          
+          console.log("Extracted company ID:", companyId);
+          return companyId;
+        }).filter(id => id); // Remove any undefined/null values
         
-        console.log("Applied company IDs:", appliedCompanyIds);
+        console.log("Final applied company IDs:", appliedCompanyIds);
+        console.log("Available company IDs:", companiesData.map(c => c._id));
+        
         setAppliedCompanies(appliedCompanyIds);
       } catch (err) {
         console.error("Error fetching data:", err);
+        console.error("Error response:", err.response?.data);
       }
     };
 
     fetchData();
-  }, [student.department, student.UID]);
+  }, [student.UID]);
 
   const handleApply = async (company) => {
+    setIsApplying(company._id); // Set loading state
+    
     try {
       console.log("Applying to company:", company._id, "for student:", student.UID);
+      console.log("Student UID type:", typeof student.UID, "Value:", student.UID);
       
       const response = await axios.post(`http://localhost:5000/api/applications/apply`, {
-        studentUID: student.UID,
+        studentUID: String(student.UID), // Ensure it's a string
         companyId: company._id
       });
 
@@ -104,7 +119,7 @@ const StudentDashboard = () => {
       console.error("Apply error:", err);
       console.error("Error response:", err.response?.data);
       
-      if (err.response?.status === 400) {
+      if (err.response?.status === 400 && err.response?.data?.message?.includes("Already applied")) {
         alert("You have already applied to this company.");
         // If already applied, add to the state to reflect the current status
         setAppliedCompanies(prev => {
@@ -114,43 +129,18 @@ const StudentDashboard = () => {
           return prev;
         });
       } else {
-        alert("Failed to apply. Please try again.");
+        alert(`Failed to apply: ${err.response?.data?.message || "Please try again."}`);
       }
+    } finally {
+      setIsApplying(null); // Clear loading state
     }
   };
 
-  const hasAppliedToCompany = (companyId) => appliedCompanies.includes(companyId);
-
-  // Function to refresh data
-  const refreshData = async () => {
-    if (!student.department || !student.UID) return;
-    
-    try {
-      console.log("Refreshing data...");
-      
-      const [companiesRes, applicationsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/companies/opportunities?department=${student.department}`),
-        axios.get(`http://localhost:5000/api/applications/student/${student.UID}`)
-      ]);
-
-      const companiesData = companiesRes.data?.data || [];
-      const applications = applicationsRes.data?.data || [];
-
-      setCompanies(companiesData);
-      
-      const appliedCompanyIds = applications.map(app => {
-        if (typeof app.companyId === 'object' && app.companyId._id) {
-          return app.companyId._id;
-        }
-        return app.companyId;
-      });
-      
-      setAppliedCompanies(appliedCompanyIds);
-      alert("Data refreshed successfully!");
-    } catch (err) {
-      console.error("Error refreshing data:", err);
-      alert("Failed to refresh data.");
-    }
+  const hasAppliedToCompany = (companyId) => {
+    const hasApplied = appliedCompanies.includes(companyId);
+    console.log(`Checking if applied to company ${companyId}:`, hasApplied);
+    console.log("Current applied companies:", appliedCompanies);
+    return hasApplied;
   };
 
   // Function to fetch current placement data
@@ -290,7 +280,7 @@ const StudentDashboard = () => {
           className={!showOnlyApplied ? 'active' : ''}
           onClick={() => setShowOnlyApplied(false)}
         >
-          All Companies
+          Available Companies
         </button>
         <button
           className={showOnlyApplied ? 'active' : ''}
@@ -311,9 +301,20 @@ const StudentDashboard = () => {
 
       {/* Companies Table */}
       <div className="companies-table-section">
-        <h3>{showOnlyApplied ? "Applied Companies" : "On-going Companies"}</h3>
+        <h3>{showOnlyApplied ? "Applied Companies" : "Available Companies"}</h3>
         {filteredCompanies.length === 0 ? (
-          <p>{showOnlyApplied ? "No applied companies." : "No companies available."}</p>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            {showOnlyApplied ? (
+              <p>You haven't applied to any companies yet.</p>
+            ) : (
+              <div>
+                <p>No companies are currently available for your UID ({student.UID}).</p>
+                <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
+                  Companies will appear here when:
+                </p>
+              </div>
+            )}
+          </div>
         ) : (
           <table className="companies-table">
             <thead>
@@ -340,10 +341,43 @@ const StudentDashboard = () => {
                   </td>
                   <td>
                     {hasAppliedToCompany(comp._id) ? (
-                      <span className="applied-status">✓ Applied</span>
+                      <span className="applied-status" style={{ 
+                        backgroundColor: '#d4edda', 
+                        color: '#155724', 
+                        padding: '0.25rem 0.5rem', 
+                        borderRadius: '0.25rem',
+                        border: '1px solid #c3e6cb',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}>
+                        ✓ Applied
+                      </span>
                     ) : (
-                      <button className="apply-button" onClick={() => handleApply(comp)}>
-                        Applied
+                      <button 
+                        className="apply-button" 
+                        onClick={() => handleApply(comp)}
+                        disabled={isApplying === comp._id}
+                        style={{
+                          backgroundColor: isApplying === comp._id ? '#6c757d' : '#007bff',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.875rem',
+                          cursor: isApplying === comp._id ? 'not-allowed' : 'pointer'
+                        }}
+                        onMouseOver={(e) => {
+                          if (isApplying !== comp._id) {
+                            e.target.style.backgroundColor = '#0056b3';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (isApplying !== comp._id) {
+                            e.target.style.backgroundColor = '#007bff';
+                          }
+                        }}
+                      >
+                        {isApplying === comp._id ? 'Applying...' : 'Apply'}
                       </button>
                     )}
                   </td>

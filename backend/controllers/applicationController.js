@@ -8,20 +8,39 @@ exports.applyToCompany = async (req, res) => {
   try {
     const { studentUID, companyId } = req.body;
 
+    console.log("=== APPLICATION REQUEST START ===");
+    console.log("Apply request received:", { 
+      studentUID, 
+      studentUIDType: typeof studentUID,
+      companyId,
+      companyIdType: typeof companyId,
+      requestBody: req.body,
+      headers: req.headers['content-type']
+    });
+
     if (!studentUID || !companyId) {
+      console.log("❌ Missing required fields");
       return res.status(400).json({ 
         success: false, 
         message: "Student UID and Company ID are required" 
       });
     }
 
+    // Ensure studentUID is a string for consistency
+    const studentUIDString = String(studentUID);
+
+    console.log("Checking for existing application with studentUID:", studentUIDString, "companyId:", companyId);
+
     // Check if already applied
     const existingApplication = await Application.findOne({ 
-      studentUID, 
+      studentUID: studentUIDString, 
       companyId 
     });
 
+    console.log("Existing application found:", !!existingApplication);
+
     if (existingApplication) {
+      console.log("❌ Already applied");
       return res.status(400).json({ 
         success: false, 
         message: "Already applied to this company" 
@@ -37,18 +56,38 @@ exports.applyToCompany = async (req, res) => {
       });
     }
 
-    // Get student details from StudentPlacement collection
-    const student = await StudentPlacement.findOne({ UID: parseInt(studentUID) });
+    console.log("Company found:", company.companyName);
+
+    // Get student details - first try StudentPlacement, then fallback to Student
+    let student = await StudentPlacement.findOne({ UID: parseInt(studentUID) });
+    let studentSource = 'StudentPlacement';
+    
     if (!student) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Student not found. Please register for placement first." 
-      });
+      console.log("Student not found in StudentPlacement, checking Student collection...");
+      const basicStudent = await Student.findOne({ UID: studentUIDString });
+      if (!basicStudent) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Student not found. Please ensure you are registered." 
+        });
+      }
+      
+      // Use basic student info if not in placement collection
+      student = {
+        name: basicStudent.name,
+        department: basicStudent.department,
+        section: basicStudent.section,
+        UID: basicStudent.UID
+      };
+      studentSource = 'Student';
+      console.log("Using basic student info from Student collection");
     }
+
+    console.log("Student found:", student.name, "from", studentSource, "collection");
 
     // Create application
     const application = new Application({
-      studentUID: studentUID,
+      studentUID: studentUIDString,
       studentName: student.name,
       companyId,
       companyName: company.companyName,
@@ -59,13 +98,41 @@ exports.applyToCompany = async (req, res) => {
       status: 'applied'
     });
 
-    await application.save();
-
-    res.json({ 
-      success: true, 
-      message: "Applied successfully!",
-      data: application 
+    console.log("About to save application:", {
+      studentUID: application.studentUID,
+      studentName: application.studentName,
+      companyId: application.companyId,
+      companyName: application.companyName
     });
+
+    try {
+      const savedApplication = await application.save();
+      
+      console.log("✅ Application saved successfully:", {
+        id: savedApplication._id,
+        studentUID: savedApplication.studentUID,
+        companyId: savedApplication.companyId,
+        createdAt: savedApplication.createdAt
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Applied successfully!",
+        data: savedApplication 
+      });
+    } catch (saveError) {
+      console.error("❌ Error saving application:", saveError);
+      
+      if (saveError.code === 11000) {
+        // Duplicate key error
+        return res.status(400).json({ 
+          success: false, 
+          message: "Already applied to this company" 
+        });
+      }
+      
+      throw saveError; // Re-throw to be caught by outer catch
+    }
 
   } catch (error) {
     console.error("Apply error:", error);
@@ -77,14 +144,53 @@ exports.applyToCompany = async (req, res) => {
   }
 };
 
+// ✅ Simple test endpoint for debugging
+exports.testApplications = async (req, res) => {
+  try {
+    const totalApplications = await Application.countDocuments();
+    const recentApplications = await Application.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('studentUID companyName createdAt');
+    
+    res.json({
+      success: true,
+      message: "Application system is working",
+      totalApplications,
+      recentApplications,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Error accessing applications", 
+      error: error.message 
+    });
+  }
+};
+
 // ✅ Get applications by student
 exports.getApplicationsByStudent = async (req, res) => {
   try {
     const { studentUID } = req.params;
     
-    const applications = await Application.find({ studentUID })
+    console.log("Fetching applications for studentUID:", studentUID, "Type:", typeof studentUID);
+    
+    // Ensure studentUID is a string for consistency
+    const studentUIDString = String(studentUID);
+    
+    const applications = await Application.find({ studentUID: studentUIDString })
       .populate('companyId', 'companyName ctc role description department')
       .sort({ appliedAt: -1 });
+
+    console.log("Found applications:", applications.length);
+    console.log("Applications data:", applications.map(app => ({
+      id: app._id,
+      studentUID: app.studentUID,
+      companyId: app.companyId?._id || app.companyId,
+      companyName: app.companyName,
+      status: app.status
+    })));
 
     res.json({ 
       success: true, 
@@ -222,7 +328,10 @@ exports.checkApplicationStatus = async (req, res) => {
   try {
     const { studentUID, companyId } = req.params;
     
-    const application = await Application.findOne({ studentUID, companyId });
+    // Ensure studentUID is a string for consistency
+    const studentUIDString = String(studentUID);
+    
+    const application = await Application.findOne({ studentUID: studentUIDString, companyId });
     
     res.json({ 
       success: true, 
