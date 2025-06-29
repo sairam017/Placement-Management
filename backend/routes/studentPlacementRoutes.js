@@ -48,6 +48,15 @@ router.get('/all', studentPlacementController.getAllStudentPlacements);
 // ✅ Update application status
 router.post('/update-status', studentPlacementController.updateApplicationStatus);
 
+// ✅ Update student placement registration
+router.put(
+  '/update/:UID',
+  upload.fields([
+    { name: 'resume', maxCount: 1 }
+  ]),
+  studentPlacementController.updatePlacementRegistration
+);
+
 // ✅ Get student by UID (must be last GET route to avoid conflicts)
 router.get('/:UID', studentPlacementController.getStudentByUID);
 

@@ -1,12 +1,14 @@
+// src/App.js
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Import all page components
 import LandingPage from './components/LandingPage';
 import LoginForm from './components/Login';
-import AdminDashboard from './components/AdminDashboard';
-import PlacementCoordinator from './components/PlacementCoordinator';
-import TrainingPlacement from './components/TrainingPlacement';
+import AdminPage from './components/AdminDashboard';
+import PlacementCoordinatorForm from './components/PlacementCoordinator';
+import TrainingPlacement from './components/TrainingPlacement'; // ✅ Correct import
 import StudentDashboard from './components/StudentDashboard';
 import PlacementDashboard from './components/PlacementDashboard';
 import StudentPlacementRegisterForm from './components/StudentPlacementRegisterForm';
@@ -19,11 +21,11 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Protected Routes */}
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin-dashboard" element={<AdminPage />} />
         <Route path="/login" element={<LoginForm />} />
-        <Route path="/placement-coordinator" element={<PlacementCoordinator />} />
-        <Route path="/placement-dashboard" element={<PlacementDashboard />} /> 
-        <Route path="/training-placement-dashboard" element={<TrainingPlacement />} />
+        <Route path="/placement-coordinator" element={<PlacementCoordinatorForm />} />
+        <Route path="/placement-dashboard" element={<PlacementDashboard />} />
+        <Route path="/training-placement-dashboard" element={<TrainingPlacement />} /> {/* ✅ Used here */}
         <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/register-placement" element={<StudentPlacementRegisterForm />} />
 

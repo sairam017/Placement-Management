@@ -9,6 +9,11 @@ const companyRoutes = require("./routes/companyRoutes");
 const studentPlacementRoutes = require("./routes/studentPlacementRoutes");
 const coordinatorRoutes = require("./routes/coordinatorRoutes");
 const tpoRoutes = require("./routes/tpoRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
+const adminLoginRoutes = require("./routes/adminLoginRoutes");
+
+// Import admin initialization
+const { initializeDefaultAdmin } = require("./controllers/adminLoginController");
 
 dotenv.config();
 
@@ -27,32 +32,8 @@ const connectDB = async () => {
     });
     console.log("✅ MongoDB connected successfully");
     
-    // Fix any existing index issues
-    try {
-      const Company = require("./models/Company");
-      await Company.collection.dropIndex("name_1");
-      console.log("✅ Dropped problematic name_1 index");
-    } catch (indexError) {
-      console.log("ℹ️  No problematic index to drop or already dropped");
-    }
-    
-    // Clean up any documents with null names
-    try {
-      const Company = require("./models/Company");
-      const deletedCount = await Company.deleteMany({ 
-        $or: [
-          { name: null }, 
-          { name: { $exists: false } },
-          { companyName: null },
-          { companyName: { $exists: false } }
-        ] 
-      });
-      if (deletedCount.deletedCount > 0) {
-        console.log(`✅ Cleaned up ${deletedCount.deletedCount} invalid company documents`);
-      }
-    } catch (cleanupError) {
-      console.log("ℹ️  No cleanup needed or cleanup failed:", cleanupError.message);
-    }
+    // Initialize default admin after DB connection
+    await initializeDefaultAdmin();
     
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
@@ -72,6 +53,8 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/coordinators", coordinatorRoutes);
 app.use("/api/tpos", tpoRoutes);
 app.use("/api/student-placement", studentPlacementRoutes);
+app.use("/api/applications", applicationRoutes);
+app.use("/api/admin", adminLoginRoutes);
 
 // Default route
 app.get("/", (req, res) => {

@@ -193,3 +193,49 @@ exports.getStudentByUID = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// ✅ Update student placement registration
+exports.updatePlacementRegistration = async (req, res) => {
+  try {
+    const { UID } = req.params;
+    const {
+      name, department, section, mailid, mobile, relocate,
+      gender, dob, address, pincode
+    } = req.body;
+
+    const uidInt = parseInt(UID, 10);
+    if (isNaN(uidInt)) {
+      return res.status(400).json({ message: 'UID must be a valid integer' });
+    }
+
+    const student = await StudentPlacement.findOne({ UID: uidInt });
+    if (!student) {
+      return res.status(404).json({ message: 'Student placement registration not found' });
+    }
+
+    // Update fields
+    if (name) student.name = name;
+    if (department) student.department = department;
+    if (section) student.section = section;
+    if (mailid) student.mailid = mailid;
+    if (mobile) student.mobile = mobile;
+    if (typeof relocate !== 'undefined') student.relocate = relocate === 'true' || relocate === true;
+    if (gender) student.gender = gender;
+    if (dob) student.dob = dob;
+    if (address) student.address = address;
+    if (pincode) student.pincode = pincode;
+
+    // Handle resume update if provided
+    if (req.files && req.files['resume'] && req.files['resume'][0]) {
+      student.resumeUrl = `/uploads/resumes/${req.files['resume'][0].filename}`;
+    }
+
+    await student.save();
+    res.status(200).json({ 
+      message: 'Placement registration updated successfully',
+      student: student 
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};

@@ -28,12 +28,17 @@ const LandingPage = () => {
       let response;
 
       if (userType === 'admin') {
-        if (userId === 'admin' && password === 'admin123') {
+        // Use dynamic admin login API
+        response = await axios.post('http://localhost:5000/api/admin/login', {
+          uid: userId.trim(),
+          password: password,
+        });
+        
+        if (response.data && response.data.success) {
+          localStorage.setItem('adminToken', response.data.token);
+          localStorage.setItem('adminData', JSON.stringify(response.data.admin));
           alert('Admin Login successful!');
           navigate('/admin-dashboard');
-          return;
-        } else {
-          setLoginError('Invalid admin credentials');
           return;
         }
       }
@@ -61,9 +66,14 @@ const LandingPage = () => {
         localStorage.setItem('token', response.data.token);
         if (userType === 'placement-coordinator') {
           localStorage.setItem('coordinator', JSON.stringify(response.data.user));
+        } else if (userType === 'training-placement-officer') {
+          // Training placement officers also need coordinator data for TrainingPlacement.js
+          localStorage.setItem('coordinator', JSON.stringify(response.data.data));
         }
         // Fix: For student, store response.data.data as 'user'
         if (userType === 'student') {
+          localStorage.setItem('user', JSON.stringify(response.data.data));
+        } else if (userType === 'training-placement-officer') {
           localStorage.setItem('user', JSON.stringify(response.data.data));
         } else {
           localStorage.setItem('user', JSON.stringify(response.data.user));

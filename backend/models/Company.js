@@ -31,7 +31,14 @@ const companySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  batch: {
+    type: Number,
+    required: false // Unique batch identifier for multiple entries
+  }
 });
+
+// NO UNIQUE INDEXES - Allow multiple entries for same company with different students
+// This ensures permanent storage of all placement opportunities
 
 // Drop the collection and recreate it to remove any conflicting indexes
 companySchema.pre('save', function() {

@@ -117,3 +117,37 @@ exports.loginTPO = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Change TPO Password
+exports.changeTPOPassword = async (req, res) => {
+  const { employeeId, currentPassword, newPassword } = req.body;
+
+  try {
+    if (!employeeId || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const tpo = await TPO.findOne({ employeeId });
+    if (!tpo) {
+      return res.status(404).json({ message: "TPO not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, tpo.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: "New password must be at least 4 characters long" });
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    tpo.password = hashedNewPassword;
+    await tpo.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Error changing TPO password:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

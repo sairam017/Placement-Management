@@ -121,3 +121,36 @@ exports.loginCoordinator = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Change coordinator password
+exports.changePassword = async (req, res) => {
+  try {
+    const { employeeId, currentPassword, newPassword } = req.body;
+
+    if (!employeeId || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const coordinator = await Coordinator.findOne({ employeeId });
+    if (!coordinator) {
+      return res.status(404).json({ message: "Coordinator not found" });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, coordinator.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    coordinator.password = hashedNewPassword;
+    await coordinator.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
