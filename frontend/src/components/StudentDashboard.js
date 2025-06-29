@@ -49,10 +49,14 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!student.UID) return;
+      if (!student.UID || !student.department) return;
 
       try {
-        console.log("Fetching data for student UID:", student.UID);
+        console.log("Fetching data for student:", {
+          UID: student.UID,
+          department: student.department,
+          section: student.section
+        });
         
         const [companiesRes, applicationsRes] = await Promise.all([
           axios.get(`http://localhost:5000/api/companies/student/${String(student.UID)}`),
@@ -62,9 +66,13 @@ const StudentDashboard = () => {
         const companiesData = companiesRes.data?.data || [];
         const applications = applicationsRes.data?.data || [];
 
-        console.log("Companies accessible to UID", student.UID, ":", companiesData.length, "companies");
+        console.log(`Companies accessible to ${student.department} student UID ${student.UID}:`, companiesData.length, "companies");
+        console.log("Companies found:", companiesData.map(c => ({
+          name: c.companyName,
+          department: c.department,
+          role: c.role
+        })));
         console.log("Applications fetched:", applications.length, "applications");
-        console.log("Student UID being used:", String(student.UID));
 
         setCompanies(companiesData);
         
@@ -94,7 +102,7 @@ const StudentDashboard = () => {
     };
 
     fetchData();
-  }, [student.UID]);
+  }, [student.UID, student.department]);
 
   const handleApply = async (company) => {
     setIsApplying(company._id); // Set loading state
@@ -256,6 +264,7 @@ const StudentDashboard = () => {
       <div className="profile-section">
         <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
         <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
+        <p><strong>Department:</strong> {student.department || <span style={{ color: 'red' }}>No Department</span>}</p>
         <p><strong>Section:</strong> {student.section || <span style={{ color: 'red' }}>No Section</span>}</p>
         <div className="profile-buttons">
           <button
@@ -292,10 +301,13 @@ const StudentDashboard = () => {
 
       {/* Info Section */}
       <div className="info-section">
-        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
           <strong>Company Sources:</strong> 
           <span className="badge bg-primary ms-2 me-2">Training Placement Officer</span>
           <span className="badge bg-success">Placement Coordinator</span>
+        </p>
+        <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '1rem' }}>
+          Companies shown are filtered based on your UID ({student.UID}) and Department ({student.department || 'Not Set'})
         </p>
       </div>
 
@@ -308,10 +320,16 @@ const StudentDashboard = () => {
               <p>You haven't applied to any companies yet.</p>
             ) : (
               <div>
-                <p>No companies are currently available for your UID ({student.UID}).</p>
+                <p>No companies are currently available for your profile:</p>
+                <p><strong>UID:</strong> {student.UID} | <strong>Department:</strong> {student.department || 'Not Set'}</p>
                 <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
-                  Companies will appear here when:
+                  Companies will appear here when they are assigned to:
                 </p>
+                <ul style={{ fontSize: '0.85rem', textAlign: 'left', display: 'inline-block', marginTop: '0.5rem' }}>
+                  <li>Your specific UID ({student.UID})</li>
+                  <li>Your department ({student.department || 'Not Set'})</li>
+                  <li>All departments (by TPO)</li>
+                </ul>
               </div>
             )}
           </div>

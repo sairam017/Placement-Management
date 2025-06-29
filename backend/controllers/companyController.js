@@ -85,19 +85,35 @@ exports.getCompaniesByStudentUID = async (req, res) => {
       });
     }
 
+    // First, get the student's department from StudentPlacement collection
+    const StudentPlacement = require("../models/studentPlacementModel");
+    const studentData = await StudentPlacement.findOne({ UID: studentUIDNumber });
+    
+    if (!studentData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Student placement data not found" 
+      });
+    }
+
+    const studentDepartment = studentData.department;
+    console.log("Student department:", studentDepartment);
+
     // Find companies where:
     // 1. Student UID is in the studentUIDs array (specifically assigned)
-    // 2. OR department is "ALL" (TPO companies available to all)
-    // 3. OR studentUIDs array is empty (department-wide companies)
+    // 2. OR department matches student's department
+    // 3. OR department is "ALL" (TPO companies available to all)
+    // 4. OR studentUIDs array is empty (department-wide companies) AND department matches
     const companies = await Company.find({
       $or: [
         { studentUIDs: studentUIDNumber },
+        { department: studentDepartment },
         { department: "ALL" },
-        { studentUIDs: { $size: 0 } }
+        { $and: [{ studentUIDs: { $size: 0 } }, { department: studentDepartment }] }
       ]
     }).sort({ createdAt: -1 });
     
-    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber}`);
+    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber} from department ${studentDepartment}`);
     
     res.json({ 
       success: true,
