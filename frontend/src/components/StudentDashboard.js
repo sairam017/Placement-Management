@@ -49,7 +49,10 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!student.UID || !student.department) return;
+      if (!student.UID) {
+        console.log("No student UID found, skipping data fetch");
+        return;
+      }
 
       try {
         console.log("Fetching data for student:", {
@@ -63,10 +66,13 @@ const StudentDashboard = () => {
           axios.get(`http://localhost:5000/api/applications/student/${String(student.UID)}`)
         ]);
 
+        console.log("Companies API response:", companiesRes.data);
+        console.log("Applications API response:", applicationsRes.data);
+
         const companiesData = companiesRes.data?.data || [];
         const applications = applicationsRes.data?.data || [];
 
-        console.log(`Companies accessible to ${student.department} student UID ${student.UID}:`, companiesData.length, "companies");
+        console.log(`Companies accessible to ${student.department || 'N/A'} student UID ${student.UID}:`, companiesData.length, "companies");
         console.log("Companies found:", companiesData.map(c => ({
           name: c.companyName,
           department: c.department,
@@ -98,6 +104,9 @@ const StudentDashboard = () => {
       } catch (err) {
         console.error("Error fetching data:", err);
         console.error("Error response:", err.response?.data);
+        if (err.response?.status === 404) {
+          console.log("Student not found in placement data, companies will be limited");
+        }
       }
     };
 

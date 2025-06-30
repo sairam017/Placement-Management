@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import './StudentPlacementRegisterForm.css';
 
 function StudentPlacementRegisterForm() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     UID: "",
@@ -84,11 +82,6 @@ function StudentPlacementRegisterForm() {
       });
       setSuccess("Registration submitted successfully!");
       setError("");
-      
-      // Redirect to student dashboard after successful registration
-      setTimeout(() => {
-        navigate("/student-dashboard");
-      }, 2000); // Wait 2 seconds to show success message
     } catch {
       setError("Failed to submit registration. Try again.");
       setSuccess("");

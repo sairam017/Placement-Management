@@ -87,33 +87,39 @@ exports.getCompaniesByStudentUID = async (req, res) => {
 
     // First, get the student's department from StudentPlacement collection
     const StudentPlacement = require("../models/studentPlacementModel");
-    const studentData = await StudentPlacement.findOne({ UID: studentUIDNumber });
+    let studentDepartment = null;
     
-    if (!studentData) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Student placement data not found" 
-      });
+    try {
+      const studentData = await StudentPlacement.findOne({ UID: studentUIDNumber });
+      if (studentData) {
+        studentDepartment = studentData.department;
+        console.log("Student department from placement data:", studentDepartment);
+      }
+    } catch (err) {
+      console.log("Could not find student in placement collection, continuing with basic search");
     }
-
-    const studentDepartment = studentData.department;
-    console.log("Student department:", studentDepartment);
 
     // Find companies where:
     // 1. Student UID is in the studentUIDs array (specifically assigned)
-    // 2. OR department matches student's department
+    // 2. OR department matches student's department (if we have it)
     // 3. OR department is "ALL" (TPO companies available to all)
-    // 4. OR studentUIDs array is empty (department-wide companies) AND department matches
+    // 4. OR studentUIDs array is empty (department-wide companies)
+    let searchCriteria = [
+      { studentUIDs: studentUIDNumber },
+      { department: "ALL" },
+      { studentUIDs: { $size: 0 } }
+    ];
+
+    // Add department-specific search if we found the student's department
+    if (studentDepartment) {
+      searchCriteria.push({ department: studentDepartment });
+    }
+
     const companies = await Company.find({
-      $or: [
-        { studentUIDs: studentUIDNumber },
-        { department: studentDepartment },
-        { department: "ALL" },
-        { $and: [{ studentUIDs: { $size: 0 } }, { department: studentDepartment }] }
-      ]
+      $or: searchCriteria
     }).sort({ createdAt: -1 });
     
-    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber} from department ${studentDepartment}`);
+    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber} from department ${studentDepartment || 'unknown'}`);
     
     res.json({ 
       success: true,
