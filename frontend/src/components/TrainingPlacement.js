@@ -46,7 +46,6 @@ const TrainingPlacement = () => {
       return;
     }
     setCoordinator(user); // Setting TPO data as coordinator
-
     try {
       // TPO fetches all students from all departments
       const res = await axios.get(
@@ -67,7 +66,6 @@ const TrainingPlacement = () => {
   const fetchCompanies = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/companies/all");
-      console.log("Companies response:", res.data);
       let list = [];
       if (Array.isArray(res.data.data)) {
         list = res.data.data;
@@ -97,7 +95,6 @@ const TrainingPlacement = () => {
   useEffect(() => {
     fetchCompanies();
   }, []);
-
   useEffect(() => {
     fetchCoordinatorAndData();
     fetchDepartmentApplications();
@@ -126,7 +123,6 @@ const TrainingPlacement = () => {
       alert("Please enter a custom company name.");
       return;
     }
-
     try {
       const payload = {
         companyName: finalCompanyName,
@@ -136,9 +132,7 @@ const TrainingPlacement = () => {
         department: selectedDepartmentForCompany, // Use selected department
         studentUIDs: selectedStudents
       };
-      console.log("Sending payload:", payload);
       const response = await axios.post(`http://localhost:5000/api/companies`, payload);
-      console.log("Response:", response.data);
       alert("Company added successfully!");
       setCompanyName("");
       setCustomCompanyName("");
@@ -150,7 +144,6 @@ const TrainingPlacement = () => {
       await fetchCompanies(); // Refresh company list
     } catch (err) {
       console.error("Error adding company:", err);
-      console.error("Error response:", err.response?.data);
       alert(`Failed to add company: ${err.response?.data?.message || err.message}`);
     }
   };
@@ -160,7 +153,6 @@ const TrainingPlacement = () => {
     if (!window.confirm("Are you sure you want to delete this company? This action cannot be undone.")) {
       return;
     }
-
     try {
       await axios.delete(`http://localhost:5000/api/companies/${companyId}`, {
         data: {
@@ -169,10 +161,8 @@ const TrainingPlacement = () => {
         }
       });
       alert("Company deleted successfully!");
-      
       // Refresh companies list
       await fetchCompanies();
-
     } catch (err) {
       console.error("Error deleting company:", err);
       alert(`Failed to delete company: ${err.response?.data?.message || err.message}`);
@@ -197,26 +187,6 @@ const TrainingPlacement = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Placements");
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "placements.xlsx");
-  };
-
-  // Export companies to Excel
-  const handleDownloadCompaniesExcel = () => {
-    const exportData = companies.map((c, idx) => ({
-      "#": idx + 1,
-      "Company Name": c.companyName,
-      "Role": c.role,
-      "CTC (LPA)": c.ctc,
-      "Department": c.department,
-      "Description": c.description,
-      "Created Date": new Date(c.createdAt).toLocaleDateString()
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Companies");
-
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "companies.xlsx");
   };
 
   // Toggle student selection
@@ -252,19 +222,15 @@ const TrainingPlacement = () => {
   // Filter students
   const getFilteredStudents = () => {
     let filteredByDepartment = studentPlacements;
-    
-    // Filter by department first (for TPO)
     if (filterDepartment) {
       filteredByDepartment = studentPlacements.filter(s => s.department === filterDepartment);
     }
-    
-    // Filter by section
+
     let filteredBySection = filteredByDepartment;
     if (filterSection) {
       filteredBySection = filteredByDepartment.filter(s => s.section === filterSection);
     }
-    
-    // Then filter by company and application status
+
     if (filterCompany) {
       if (filter === "applied") {
         return filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
@@ -320,8 +286,8 @@ const TrainingPlacement = () => {
   };
 
   return (
-    <div className="container mt-4 position-relative">
-      <div className="d-flex justify-content-end position-absolute" style={{ top: 0, right: 0 }}>
+    <div className="container mt-4">
+      <div className="d-flex justify-content-end mb-3">
         <button
           className="btn btn-warning me-2"
           onClick={() => setShowPasswordModal(true)}
@@ -343,147 +309,130 @@ const TrainingPlacement = () => {
       <h2>Welcome, {coordinator?.name} (Training Placement Officer)</h2>
       <p><strong>Employee ID:</strong> {coordinator?.employeeId}</p>
 
-      {/* Filters and Actions */}
-      <div className="d-flex justify-content-between mb-3 align-items-center">
-        <div className="d-flex align-items-center">
-          <select
-            className="form-select form-select-sm me-2"
-            style={{ width: 200 }}
-            value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
-          >
-            <option value="">-- All Departments --</option>
-            {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-          <select
-            className="form-select form-select-sm me-2"
-            style={{ width: 180 }}
-            value={filterSection}
-            onChange={(e) => setFilterSection(e.target.value)}
-          >
-            <option value="">-- All Sections --</option>
-            {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
-              <option key={section} value={section}>{section}</option>
-            ))}
-          </select>
-          <select
-            className="form-select form-select-sm me-2"
-            style={{ width: 220 }}
-            value={filterCompany}
-            onChange={(e) => setFilterCompany(e.target.value)}
-          >
-            <option value="">-- Filter by Company --</option>
-            {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
-              <option key={companyName} value={companyName}>{companyName}</option>
-            ))}
-          </select>
-          <button
-            className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-            onClick={() => setFilter("all")}
-            type="button"
-          >
-            All Students
-          </button>
-          <button
-            className={`btn btn-sm ${filter === 'applied' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-            onClick={() => setFilter("applied")}
-            type="button"
-          >
-            Applied
-          </button>
-          <button
-            className={`btn btn-sm ${filter === 'not_applied' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setFilter("not_applied")}
-            type="button"
-          >
-            Not Applied
-          </button>
-        </div>
-        <div className="d-flex align-items-center">
-          <button className="btn btn-outline-success me-2" onClick={handleDownloadExcel}>
-            Download Excel
-          </button>
-          <button className="btn btn-outline-success" onClick={handleDownloadCompaniesExcel}>
-            Download Companies Excel
-          </button>
-        </div>
+      {/* Filters */}
+      <div className="mb-3 d-flex flex-wrap align-items-center gap-2">
+        <select
+          className="form-select form-select-sm"
+          style={{ width: 200 }}
+          value={filterDepartment}
+          onChange={(e) => setFilterDepartment(e.target.value)}
+        >
+          <option value="">-- All Departments --</option>
+          {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+        <select
+          className="form-select form-select-sm"
+          style={{ width: 180 }}
+          value={filterSection}
+          onChange={(e) => setFilterSection(e.target.value)}
+        >
+          <option value="">-- All Sections --</option>
+          {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+            <option key={section} value={section}>{section}</option>
+          ))}
+        </select>
+        <select
+          className="form-select form-select-sm"
+          style={{ width: 220 }}
+          value={filterCompany}
+          onChange={(e) => setFilterCompany(e.target.value)}
+        >
+          <option value="">-- Filter by Company --</option>
+          {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
+            <option key={companyName} value={companyName}>{companyName}</option>
+          ))}
+        </select>
+        <button className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilter("all")}>All Students</button>
+        <button className={`btn btn-sm ${filter === 'applied' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilter("applied")}>Applied</button>
+        <button className={`btn btn-sm ${filter === 'not_applied' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilter("not_applied")}>Not Applied</button>
+        <button className="btn btn-outline-success ms-auto" onClick={handleDownloadExcel}>
+          Download Excel
+        </button>
       </div>
 
-      {/* Student Table */}
-      {loading ? (
-        <p>Loading...</p>
-      ) : error ? (
-        <p className="text-danger">{error}</p>
-      ) : (
-        <table className="table table-bordered">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                  onChange={handleSelectAllStudents}
-                />
-              </th>
-              <th>#</th>
-              <th>Name</th>
-              <th>UID</th>
-              <th>Department</th>
-              <th>Section</th>
-              <th>Mail</th>
-              <th>Mobile</th>
-              <th>Relocate</th>
-              <th>Resume</th>
-              <th>Applied</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((s, idx) => (
-              <tr key={s.UID}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.includes(s.UID)}
-                    onChange={() => handleStudentSelect(s.UID)}
-                  />
-                </td>
-                <td>{idx + 1}</td>
-                <td>{s.name}</td>
-                <td>{s.UID}</td>
-                <td>{s.department}</td>
-                <td>{s.section}</td>
-                <td>{s.mailid}</td>
-                <td>{s.mobile}</td>
-                <td>{s.relocate ? "Yes" : "No"}</td>
-                <td>
-                  {s.resumeUrl ? (
-                    <a href={`http://localhost:5000${s.resumeUrl}`} target="_blank" rel="noopener noreferrer">View</a>
-                  ) : "-"}
-                </td>
-                <td>
-                  {filterCompany
-                    ? hasStudentAppliedToCompany(s.UID, filterCompany) ? "Yes" : "No"
-                    : hasStudentAnyApplication(s.UID) ? "Yes" : "No"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {/* Company Management Section */}
-      <div className="card mb-4">
+      {/* Student Table Card */}
+      <div className="card mb-4 fadeInUp">
         <div className="card-header d-flex justify-content-between align-items-center">
-          <h4 className="mb-0">Company Management - All Departments (TPO Access)</h4>
-          <button className="btn btn-outline-success btn-sm" onClick={handleDownloadCompaniesExcel}>
-            Export Companies
+          <h4 className="mb-0">Student List</h4>
+          <button className="btn btn-outline-success btn-sm" onClick={handleDownloadExcel}>
+            Export Students
           </button>
         </div>
         <div className="card-body">
-          <div className="table-responsive" style={{ maxHeight: "300px", overflowY: "auto" }}>
-            <table className="table table-sm table-bordered">
+          <div className="table-responsive" style={{ maxHeight: "400px", overflowY: "auto" }}>
+            <table className="table table-hover table-bordered align-middle">
+              <thead className="table-dark">
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                      onChange={handleSelectAllStudents}
+                    />
+                  </th>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>UID</th>
+                  <th>Department</th>
+                  <th>Section</th>
+                  <th>Mail</th>
+                  <th>Mobile</th>
+                  <th>Relocate</th>
+                  <th>Resume</th>
+                  <th>Applied</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((s, idx) => (
+                  <tr key={s.UID}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(s.UID)}
+                        onChange={() => handleStudentSelect(s.UID)}
+                      />
+                    </td>
+                    <td>{idx + 1}</td>
+                    <td>{s.name}</td>
+                    <td>{s.UID}</td>
+                    <td>{s.department}</td>
+                    <td>{s.section}</td>
+                    <td>{s.mailid}</td>
+                    <td>{s.mobile}</td>
+                    <td>{s.relocate ? "Yes" : "No"}</td>
+                    <td>
+                      {s.resumeUrl ? (
+                        <a href={`http://localhost:5000${s.resumeUrl}`} target="_blank" rel="noopener noreferrer">View</a>
+                      ) : "-"}
+                    </td>
+                    <td>
+                      {filterCompany
+                        ? hasStudentAppliedToCompany(s.UID, filterCompany) ? "Yes" : "No"
+                        : hasStudentAnyApplication(s.UID) ? "Yes" : "No"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredStudents.length === 0 && (
+              <div className="text-center text-muted p-3">
+                No students found matching your filters.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Company Management Section */}
+      <div className="card mb-4 fadeInUp">
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <h4 className="mb-0">Company Management - All Departments (TPO Access)</h4>
+        </div>
+        <div className="card-body">
+          <div className="table-responsive" style={{ maxHeight: "400px", overflowY: "auto" }}>
+            <table className="table table-hover table-bordered align-middle">
               <thead className="table-dark">
                 <tr>
                   <th>#</th>
@@ -512,7 +461,7 @@ const TrainingPlacement = () => {
                         onClick={() => handleDeleteCompany(company._id)}
                         title="Delete Company"
                       >
-                        <i className="fas fa-trash"></i> Delete
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -613,7 +562,6 @@ const TrainingPlacement = () => {
           <button className="btn btn-success" onClick={handleAddPlacement}>ADD</button>
         </div>
       </div>
-
       <div className="row g-2 mb-3">
         <div className="col-md-4">
           <label className="form-label">Target Department:</label>
@@ -635,7 +583,7 @@ const TrainingPlacement = () => {
         </div>
       </div>
 
-      {/* Password Change Modal */}
+      {/* Password Modal */}
       {showPasswordModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">

@@ -112,16 +112,40 @@ exports.updateStudent = async (req, res) => {
   }
 };
 
-// Delete Student
+// Delete Student (Admin only)
 exports.deleteStudent = async (req, res) => {
   try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        message: "Access denied. Admin privileges required." 
+      });
+    }
+
     const student = await Student.findOneAndDelete({ UID: req.params.uid });
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Student not found" 
+      });
     }
-    res.json({ message: "Student deleted successfully" });
+    
+    res.json({ 
+      success: true,
+      message: "Student deleted successfully",
+      deletedStudent: {
+        UID: student.UID,
+        name: student.name,
+        department: student.department
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Delete student error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while deleting student" 
+    });
   }
 };
 

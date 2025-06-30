@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import StudentRegisterForm from './StudentRegisterForm';
@@ -47,17 +47,35 @@ const AdminPage = () => {
     navigate('/');
   };
 
-  useEffect(() => {
-    if (activeTab === 'student') fetchStudents();
-    else if (activeTab === 'pc') fetchPCs();
-    else if (activeTab === 'tpo') fetchTPOs();
-  }, [activeTab]);
+  // Define fetch functions first
+  const fetchStudents = useCallback(async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/students/all');
+      setStudents(res.data.data || []);
+    } catch {
+      setStudents([]);
+    }
+  }, []);
 
-  useEffect(() => {
-    filterStudents();
-  }, [students, studentFilter]);
+  const fetchPCs = useCallback(async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/coordinators/coordinators');
+      setPCs(res.data.data || []);
+    } catch {
+      setPCs([]);
+    }
+  }, []);
 
-  const filterStudents = () => {
+  const fetchTPOs = useCallback(async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/tpos');
+      setTPOs(res.data.data || []);
+    } catch {
+      setTPOs([]);
+    }
+  }, []);
+
+  const filterStudents = useCallback(() => {
     if (studentFilter === 'all') {
       setFilteredStudents(students);
     } else {
@@ -66,47 +84,34 @@ const AdminPage = () => {
       );
       setFilteredStudents(filtered);
     }
-  };
+  }, [students, studentFilter]);
 
   const getUniqueDepartments = () => {
     const departments = [...new Set(students.map(s => s.department).filter(d => d))];
     return departments.sort();
   };
 
-  const fetchStudents = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/students/all');
-      setStudents(res.data.data || []);
-    } catch {
-      setStudents([]);
-    }
-  };
+  // Effects that use the functions above
+  useEffect(() => {
+    if (activeTab === 'student') fetchStudents();
+    else if (activeTab === 'pc') fetchPCs();
+    else if (activeTab === 'tpo') fetchTPOs();
+  }, [activeTab, fetchStudents, fetchPCs, fetchTPOs]);
 
-  const fetchPCs = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/coordinators/coordinators');
-      setPCs(res.data.data || []);
-    } catch {
-      setPCs([]);
-    }
-  };
-
-  const fetchTPOs = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/tpos');
-      setTPOs(res.data.data || []);
-    } catch {
-      setTPOs([]);
-    }
-  };
+  useEffect(() => {
+    filterStudents();
+  }, [filterStudents]);
 
   const deleteStudent = async (uid) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/students/${uid}`);
+        await axios.delete(`http://localhost:5000/api/students/${uid}`, {
+          headers: getAuthHeaders()
+        });
         alert('Student deleted successfully');
         fetchStudents();
       } catch (error) {
+        console.error('Delete student error:', error);
         alert('Error deleting student: ' + (error.response?.data?.message || 'Server error'));
       }
     }
@@ -115,10 +120,13 @@ const AdminPage = () => {
   const deletePC = async (employeeId) => {
     if (window.confirm('Are you sure you want to delete this Placement Coordinator?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/coordinators/${employeeId}`);
+        await axios.delete(`http://localhost:5000/api/coordinators/${employeeId}`, {
+          headers: getAuthHeaders()
+        });
         alert('Placement Coordinator deleted successfully');
         fetchPCs();
       } catch (error) {
+        console.error('Delete PC error:', error);
         alert('Error deleting Placement Coordinator: ' + (error.response?.data?.message || 'Server error'));
       }
     }
@@ -127,10 +135,13 @@ const AdminPage = () => {
   const deleteTPO = async (tpoId) => {
     if (window.confirm('Are you sure you want to delete this Training & Placement Officer?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/tpos/${tpoId}`);
+        await axios.delete(`http://localhost:5000/api/tpos/${tpoId}`, {
+          headers: getAuthHeaders()
+        });
         alert('Training & Placement Officer deleted successfully');
         fetchTPOs();
       } catch (error) {
+        console.error('Delete TPO error:', error);
         alert('Error deleting TPO: ' + (error.response?.data?.message || 'Server error'));
       }
     }

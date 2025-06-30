@@ -23,4 +23,16 @@ router.get("/check/:studentUID/:companyId", applicationController.checkApplicati
 // GET /api/applications/stats - Get application statistics
 router.get("/stats", applicationController.getApplicationStats);
 
+// GET /api/applications/test - Simple test endpoint
+router.get("/test", (req, res) => {
+  res.json({ 
+    success: true, 
+    message: "Application routes are working!",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// GET /api/applications/debug - Debug applications system
+router.get("/debug", applicationController.testApplications);
+
 module.exports = router;

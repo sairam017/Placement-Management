@@ -70,6 +70,71 @@ exports.getCompaniesByDepartment = async (req, res) => {
   }
 };
 
+// ✅ Get companies accessible to a specific student UID
+exports.getCompaniesByStudentUID = async (req, res) => {
+  try {
+    const { studentUID } = req.params;
+    const studentUIDNumber = parseInt(studentUID);
+    
+    console.log("Fetching companies for student UID:", studentUIDNumber);
+    
+    if (!studentUIDNumber) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Valid student UID is required" 
+      });
+    }
+
+    // First, get the student's department from StudentPlacement collection
+    const StudentPlacement = require("../models/studentPlacementModel");
+    let studentDepartment = null;
+    
+    try {
+      const studentData = await StudentPlacement.findOne({ UID: studentUIDNumber });
+      if (studentData) {
+        studentDepartment = studentData.department;
+        console.log("Student department from placement data:", studentDepartment);
+      }
+    } catch (err) {
+      console.log("Could not find student in placement collection, continuing with basic search");
+    }
+
+    // Find companies where:
+    // 1. Student UID is in the studentUIDs array (specifically assigned)
+    // 2. OR department matches student's department (if we have it)
+    // 3. OR department is "ALL" (TPO companies available to all)
+    // 4. OR studentUIDs array is empty (department-wide companies)
+    let searchCriteria = [
+      { studentUIDs: studentUIDNumber },
+      { department: "ALL" },
+      { studentUIDs: { $size: 0 } }
+    ];
+
+    // Add department-specific search if we found the student's department
+    if (studentDepartment) {
+      searchCriteria.push({ department: studentDepartment });
+    }
+
+    const companies = await Company.find({
+      $or: searchCriteria
+    }).sort({ createdAt: -1 });
+    
+    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber} from department ${studentDepartment || 'unknown'}`);
+    
+    res.json({ 
+      success: true,
+      data: companies,
+      count: companies.length 
+    });
+  } catch (error) {
+    console.error("Error fetching companies for student UID:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to fetch companies." 
+    });
+  }
+};
+
 // ✅ Get all companies
 exports.getAllCompanies = async (req, res) => {
   try {
