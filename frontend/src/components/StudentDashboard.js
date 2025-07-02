@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './StudentDashboard.css';
 
@@ -9,6 +9,7 @@ const StudentDashboard = () => {
   const [appliedCompanies, setAppliedCompanies] = useState([]);
   const [showOnlyApplied, setShowOnlyApplied] = useState(false);
   const [isApplying, setIsApplying] = useState(null); // Track which company is being applied to
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Update modal states
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -28,6 +29,7 @@ const StudentDashboard = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -112,6 +114,18 @@ const StudentDashboard = () => {
 
     fetchData();
   }, [student.UID, student.department]);
+
+  // Handle success message from placement registration redirect
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clear the message after 5 seconds
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   const handleApply = async (company) => {
     setIsApplying(company._id); // Set loading state
@@ -256,78 +270,103 @@ const StudentDashboard = () => {
 
   return (
     <div className="student-dashboard">
-      {/* Logout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
-        <button
-          className="logout-btn"
-          onClick={() => {
-            localStorage.clear();
-            window.location.href = "/";
-          }}
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* Student Info */}
-      <div className="profile-section">
-        <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
-        <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
-        <p><strong>Department:</strong> {student.department || <span style={{ color: 'red' }}>No Department</span>}</p>
-        <p><strong>Section:</strong> {student.section || <span style={{ color: 'red' }}>No Section</span>}</p>
-        <div className="profile-buttons">
-          <button
-            onClick={() => navigate('/register-placement', { state: { student } })}
-            className="register-btn"
-          >
-            Register for Placement
-          </button>
-          <button
-            onClick={openUpdateModal}
-            className="update-btn"
-            style={{ marginLeft: '10px', backgroundColor: '#6c757d' }}
-          >
-            Update Profile
-          </button>
+      <div className="student-dashboard-container">
+        {/* Dashboard Header */}
+        <div className="dashboard-header">
+          <h1>Student Dashboard</h1>
+          <p>Manage your placement activities and applications</p>
         </div>
-      </div>
 
-      {/* Filter Buttons */}
-      <div className="filter-buttons">
-        <button
-          className={!showOnlyApplied ? 'active' : ''}
-          onClick={() => setShowOnlyApplied(false)}
-        >
-          Available Companies
-        </button>
-        <button
-          className={showOnlyApplied ? 'active' : ''}
-          onClick={() => setShowOnlyApplied(true)}
-        >
-          Applied Companies
-        </button>
-      </div>
+        {/* Success Message */}
+        {successMessage && (
+          <div className="alert alert-success" style={{ margin: '0 0 1rem 0', textAlign: 'center', padding: '15px', backgroundColor: '#d4edda', color: '#155724', border: '1px solid #c3e6cb', borderRadius: '8px' }}>
+            {successMessage}
+          </div>
+        )}
 
-      {/* Info Section */}
-      <div className="info-section">
-        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
-          <strong>Company Sources:</strong> 
-          <span className="badge bg-primary ms-2 me-2">Training Placement Officer</span>
-          <span className="badge bg-success">Placement Coordinator</span>
-        </p>
-        <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '1rem' }}>
-          Companies shown are filtered based on your UID ({student.UID}) and Department ({student.department || 'Not Set'})
-        </p>
-      </div>
+        {/* Student Info */}
+        <div className="profile-section">
+          {/* Logout button in top-right corner */}
+          <div className="logout-container">
+            <button
+              className="logout-btn"
+              onClick={() => {
+                localStorage.clear();
+                window.location.href = "/";
+              }}
+            >
+              Logout
+            </button>
+          </div>
+          
+          <h2>Welcome, {student.name || <span style={{ color: 'red' }}>No Name</span>}</h2>
+          
+          {/* Credentials in row layout */}
+          <div className="credentials-row">
+            <p><strong>UID:</strong> {student.UID || <span style={{ color: 'red' }}>No UID</span>}</p>
+            <p><strong>Department:</strong> {student.department || <span style={{ color: 'red' }}>No Department</span>}</p>
+            <p><strong>Section:</strong> {student.section || <span style={{ color: 'red' }}>No Section</span>}</p>
+          </div>
+        </div>
 
-      {/* Companies Table */}
-      <div className="companies-table-section">
-        <h3>{showOnlyApplied ? "Applied Companies" : "Available Companies"}</h3>
-        {filteredCompanies.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            {showOnlyApplied ? (
-              <p>You haven't applied to any companies yet.</p>
-            ) : (
+        {/* Main content layout */}
+        <div className="dashboard-main-content">
+          {/* Left sidebar for buttons */}
+          <div className="dashboard-sidebar">
+            <div className="profile-buttons">
+              <button
+                onClick={() => navigate('/register-placement', { state: { student } })}
+                className="register-btn"
+              >
+                Register for Placement
+              </button>
+              <button
+                onClick={openUpdateModal}
+                className="update-btn"
+              >
+                Update Profile
+              </button>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="filter-buttons">
+              <button
+                className={!showOnlyApplied ? 'active' : ''}
+                onClick={() => setShowOnlyApplied(false)}
+              >
+                All Companies
+              </button>
+              <button
+                className={showOnlyApplied ? 'active' : ''}
+                onClick={() => setShowOnlyApplied(true)}
+              >
+                Applied Companies
+              </button>
+            </div>
+          </div>
+
+          {/* Right side - Table content */}
+          <div className="dashboard-table-content">
+            {/* Info Section */}
+            <div className="info-section">
+              <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
+                <strong>Company Sources:</strong> 
+                <span className="badge bg-primary ms-2 me-2">Training Placement Officer</span>
+                <span className="badge bg-success">Placement Coordinator</span>
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '1rem' }}>
+                Companies shown are filtered based on your UID ({student.UID}) and Department ({student.department || 'Not Set'})
+              </p>
+            </div>
+
+            {/* Companies Table */}
+            <div className="companies-table-section">
+              <h3>{showOnlyApplied ? "Applied Companies" : "Available Companies"}</h3>
+              {filteredCompanies.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  {showOnlyApplied ? (
+                    <p>You haven't applied to any companies yet.</p>
+                  ) : (
               <div>
                 <p>No companies are currently available for your profile:</p>
                 <p><strong>UID:</strong> {student.UID} | <strong>Department:</strong> {student.department || 'Not Set'}</p>
@@ -454,13 +493,9 @@ const StudentDashboard = () => {
                         onChange={(e) => setUpdateData({...updateData, department: e.target.value})}
                         required
                       >
-                        <option value="">Select Department</option>
-                        <option value="CSE">Computer Science and Engineering</option>
-                        <option value="ECE">Electronics and Communication Engineering</option>
-                        <option value="EEE">Electrical and Electronics Engineering</option>
-                        <option value="MECH">Mechanical Engineering</option>
-                        <option value="CIVIL">Civil Engineering</option>
-                        <option value="IT">Information Technology</option>
+                        <option value="">-- Select Department --</option>
+                        <option value="MCA">MCA</option>
+                        <option value="MBA">MBA</option>
                       </select>
                     </div>
                   </div>
@@ -605,6 +640,9 @@ const StudentDashboard = () => {
           </div>
         </div>
       )}
+            </div> {/* Closing dashboard-table-content */}
+          </div> {/* Closing dashboard-main-content */}
+        </div> {/* Closing student-dashboard-container */}
     </div>
   );
 };

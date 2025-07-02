@@ -202,23 +202,58 @@ const PlacementDashboard = () => {
     // Filter by section first
     if (filterSection) {
       filteredBySection = studentPlacements.filter(s => s.section === filterSection);
+      console.log(`Filtered by section '${filterSection}':`, filteredBySection.length, 'students');
     }
     
-    // Then filter by company and application status
+    // Then filter by company - show only students who are eligible for the selected company
     if (filterCompany) {
-      if (filter === "applied") {
-        return filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
-      } else if (filter === "not_applied") {
-        return filteredBySection.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
+      console.log(`Filtering by company: '${filterCompany}'`);
+      
+      // Find the selected company to get its studentUIDs
+      const selectedCompany = companies.find(c => c.companyName === filterCompany);
+      
+      if (selectedCompany && selectedCompany.studentUIDs && selectedCompany.studentUIDs.length > 0) {
+        // Filter students to show only those whose UIDs are in the company's studentUIDs array
+        filteredBySection = filteredBySection.filter(student => 
+          selectedCompany.studentUIDs.includes(parseInt(student.UID))
+        );
+        console.log(`Students eligible for ${filterCompany}:`, filteredBySection.length);
+        console.log('Eligible student UIDs from company:', selectedCompany.studentUIDs);
+      } else if (selectedCompany && (!selectedCompany.studentUIDs || selectedCompany.studentUIDs.length === 0)) {
+        // If company has no specific students assigned, show all students from the department
+        console.log(`Company ${filterCompany} has no specific students assigned, showing all department students`);
       } else {
+        console.log(`Company ${filterCompany} not found in companies list`);
+        // If company not found, show no students
+        filteredBySection = [];
+      }
+      
+      // Now apply the filter buttons (applied/not_applied) on the company-eligible students
+      if (filter === "applied") {
+        const result = filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
+        console.log(`Students applied to ${filterCompany}:`, result.length);
+        return result;
+      } else if (filter === "not_applied") {
+        const result = filteredBySection.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
+        console.log(`Students NOT applied to ${filterCompany}:`, result.length);
+        return result;
+      } else {
+        // "All Students" - return all eligible students for the company
+        console.log(`All eligible students for ${filterCompany}:`, filteredBySection.length);
         return filteredBySection;
       }
     } else {
+      // No company filter - use existing logic
       if (filter === "applied") {
-        return filteredBySection.filter((s) => hasStudentAnyApplication(s.UID));
+        const result = filteredBySection.filter((s) => hasStudentAnyApplication(s.UID));
+        console.log(`Students with any application:`, result.length);
+        return result;
       } else if (filter === "not_applied") {
-        return filteredBySection.filter((s) => !hasStudentAnyApplication(s.UID));
+        const result = filteredBySection.filter((s) => !hasStudentAnyApplication(s.UID));
+        console.log(`Students with no applications:`, result.length);
+        return result;
       } else {
+        console.log(`All students:`, filteredBySection.length);
         return filteredBySection;
       }
     }
@@ -243,7 +278,7 @@ const PlacementDashboard = () => {
     }
 
     try {
-      const response = await axios.put('http://localhost:5000/api/coordinators/change-password', {
+      await axios.put('http://localhost:5000/api/coordinators/change-password', {
         employeeId: coordinator.employeeId,
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
@@ -295,202 +330,162 @@ const PlacementDashboard = () => {
   };
 
   return (
-    <div className="container mt-4 position-relative">
-      <div className="d-flex justify-content-end position-absolute" style={{ top: 0, right: 0 }}>
-        <button
-          className="btn btn-warning me-2"
-          onClick={() => setShowPasswordModal(true)}
-        >
-          Change Password
-        </button>
-        <button
-          className="btn btn-danger"
-          onClick={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("coordinator");
-            window.location.href = "/";
-          }}
-        >
+    <div className="placement-dashboard">
+      {/* Header Section */}
+      <div className="header-section">
+        <div className="welcome-text">
+          <h2>Welcome, {coordinator?.name}</h2>
+          <p>Department: {coordinator?.department}</p>
+        </div>
+        <button className="logout-btn" onClick={() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("coordinator");
+          window.location.href = "/";
+        }}>
           Logout
         </button>
       </div>
-      <h2>Welcome, {coordinator?.name}</h2>
-      <p><strong>Department:</strong> {coordinator?.department}</p>
 
-      <div className="d-flex justify-content-between mb-3 align-items-center">
-        <div className="d-flex align-items-center">
-          {/* Section Filter Dropdown */}
-          <select
-            className="form-select form-select-sm me-2"
-            style={{ width: 180, display: "inline-block" }}
-            value={filterSection}
-            onChange={(e) => setFilterSection(e.target.value)}
-          >
-            <option value="">-- All Sections --</option>
-            {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
-              <option key={section} value={section}>{section}</option>
-            ))}
-          </select>
-          {/* Company Filter Dropdown */}
-          <select
-            className="form-select form-select-sm me-2"
-            style={{ width: 220, display: "inline-block" }}
-            value={filterCompany}
-            onChange={(e) => setFilterCompany(e.target.value)}
-          >
-            <option value="">-- Filter by Company --</option>
-            {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
-              <option key={companyName} value={companyName}>{companyName}</option>
-            ))}
-          </select>
-          <button
-            className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-            onClick={() => setFilter("all")}
-            type="button"
-          >
-            All Students
-          </button>
-          <button
-            className={`btn btn-sm ${filter === 'applied' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-            onClick={() => setFilter("applied")}
-            type="button"
-          >
-            Applied
-          </button>
-          <button
-            className={`btn btn-sm ${filter === 'not_applied' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setFilter("not_applied")}
-            type="button"
-          >
-            Not Applied
-          </button>
-        </div>
-        <div className="d-flex align-items-center">
-          <button className="btn btn-outline-success me-2" onClick={handleDownloadExcel} type="button">
-            Download Excel
-          </button>
-        </div>
-      </div>
+      {/* Filter Controls Row */}
+      <div className="filter-row">
+  <select className="filter-dropdown" value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)}>
+    <option value="">-- Filter by Company --</option>
+    {companies.map((company) => (
+      <option key={company._id} value={company.companyName}>
+        {company.companyName}
+      </option>
+    ))}
+  </select>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : error ? (
-        <p className="text-danger">{error}</p>
-      ) : (
-        <table className="table table-bordered">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                  onChange={handleSelectAllStudents}
-                />
-              </th>
-              <th>#</th>
-              <th>Name</th>
-              <th>UID</th>
-              <th>Section</th>
-              <th>Mail</th>
-              <th>Mobile</th>
-              <th>Relocate</th>
-              <th>Resume</th>
-              <th>Applied</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((s, idx) => (
-              <tr key={s.UID}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.includes(s.UID)}
-                    onChange={() => handleStudentSelect(s.UID)}
-                  />
-                </td>
-                <td>{idx + 1}</td>
-                <td>{s.name}</td>
-                <td>{s.UID}</td>
-                <td>{s.section}</td>
-                <td>{s.mailid}</td>
-                <td>{s.mobile}</td>
-                <td>{s.relocate ? "Yes" : "No"}</td>
-                <td>
-                  {s.resumeUrl ? (
-                    <a href={`http://localhost:5000${s.resumeUrl}`} target="_blank" rel="noopener noreferrer">View</a>
-                  ) : "-"}
-                </td>
-                <td>
-                  {filterCompany
-                    ? hasStudentAppliedToCompany(s.UID, filterCompany) ? "Yes" : "No"
-                    : hasStudentAnyApplication(s.UID) ? "Yes" : "No"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  <select className="filter-dropdown" value={filterSection} onChange={(e) => setFilterSection(e.target.value)}>
+    <option value="">-- Filter by Section --</option>
+    {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+      <option key={section} value={section}>
+        {section}
+      </option>
+    ))}
+  </select>
+
+  <div className="filter-buttons">
+    <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter("all")}>
+      All Students
+    </button>
+    <button className={`filter-btn ${filter === 'applied' ? 'active' : ''}`} onClick={() => setFilter("applied")}>
+      Applied
+    </button>
+    <button className={`filter-btn ${filter === 'not_applied' ? 'active' : ''}`} onClick={() => setFilter("not_applied")}>
+      Not Applied
+    </button>
+  </div>
+
+  <button className="download-btn" onClick={handleDownloadExcel}>
+    Download Excel
+  </button>
+</div>
+
+      {/* Filter Information */}
+      {filterCompany && (
+        <div className="filter-info">
+          <p>
+            Showing {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''} 
+            {(() => {
+              const selectedCompany = companies.find(c => c.companyName === filterCompany);
+              if (selectedCompany && selectedCompany.studentUIDs && selectedCompany.studentUIDs.length > 0) {
+                return ` eligible for ${filterCompany}`;
+              } else {
+                return ` for ${filterCompany} (all department students)`;
+              }
+            })()}
+          </p>
+        </div>
       )}
 
-      {/* Company Management Section */}
-      <div className="card mb-4">
-        <div className="card-header">
-          <h4>Company Management - {coordinator?.department} Department</h4>
-        </div>
-        <div className="card-body">
-          <div className="table-responsive" style={{ maxHeight: "300px", overflowY: "auto" }}>
-            <table className="table table-sm table-bordered">
-              <thead className="table-dark">
+      {/* Students Table */}
+      <div className="students-section">
+        {loading ? (
+          <div className="loading-state">Loading...</div>
+        ) : error ? (
+          <div className="error-state">{error}</div>
+        ) : (
+          <div className="table-container">
+            <table className="students-table">
+              <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Company Name</th>
-                  <th>Role</th>
-                  <th>CTC (LPA)</th>
-                  <th>Department</th>
-                  <th>Action</th>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                      onChange={handleSelectAllStudents}
+                    />
+                  </th>
+                  <th>S.No</th>
+                  <th>Name</th>
+                  <th>UID</th>
+                  <th>Section</th>
+                  <th>Email</th>
+                  <th>Mobile</th>
+                  <th>Relocate</th>
+                  <th>Resume</th>
+                  <th>Applied</th>
                 </tr>
               </thead>
               <tbody>
-                {companies
-                  .filter(company => 
-                    company.department === coordinator?.department || 
-                    company.department === 'ALL'
-                  )
-                  .map((company, idx) => (
-                  <tr key={company._id}>
-                    <td>{idx + 1}</td>
-                    <td>{company.companyName}</td>
-                    <td>{company.role}</td>
-                    <td>{company.ctc}</td>
+                {filteredStudents.map((student, index) => (
+                  <tr key={student.UID}>
                     <td>
-                      <span className={`badge ${company.department === 'ALL' ? 'bg-warning text-dark' : 'bg-primary'}`}>
-                        {company.department === 'ALL' ? 'ALL (TPO)' : company.department}
-                      </span>
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(student.UID)}
+                        onChange={() => handleStudentSelect(student.UID)}
+                      />
+                    </td>
+                    <td>{index + 1}</td>
+                    <td>{student.name}</td>
+                    <td>{student.UID}</td>
+                    <td>{student.section}</td>
+                    <td>{student.mailid}</td>
+                    <td>{student.mobile}</td>
+                    <td>{student.relocate ? "Yes" : "No"}</td>
+                    <td>
+                      {student.resumeUrl ? (
+                        <a 
+                          href={`http://localhost:5000${student.resumeUrl}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="resume-link"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDeleteCompany(company._id, company.department)}
-                        title={company.department === coordinator?.department 
-                          ? "Delete Company" 
-                          : "Cannot delete - Not your department or TPO company"}
-                        disabled={company.department !== coordinator?.department}
-                      >
-                        Delete
-                      </button>
+                      {filterCompany
+                        ? hasStudentAppliedToCompany(student.UID, filterCompany) ? "Yes" : "No"
+                        : hasStudentAnyApplication(student.UID) ? "Yes" : "No"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        )}
       </div>
 
-      <h4>Add Company</h4>
-      <div className="row g-2 mb-3">
-        <div className="col-md-3">
+      {/* Add Placement Section */}
+      <div className="add-placement-section">
+        <h3>Add Placement</h3>
+        <div className="placement-form">
+          <input
+            type="text"
+            placeholder="Selected UIDs"
+            className="form-input uid-input"
+            value={selectedStudents.join(', ')}
+            readOnly
+          />
           <select
-            className="form-control"
+            className="form-input company-select"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
           >
@@ -499,85 +494,50 @@ const PlacementDashboard = () => {
               <option value="Google India">Google India</option>
               <option value="Microsoft India">Microsoft India</option>
               <option value="Amazon India">Amazon India</option>
-              <option value="IBM India">IBM India</option>
-              <option value="Accenture India">Accenture India</option>
               <option value="TCS (Tata Consultancy Services)">TCS (Tata Consultancy Services)</option>
               <option value="Infosys">Infosys</option>
               <option value="Wipro">Wipro</option>
-              <option value="Capgemini India">Capgemini India</option>
-              <option value="Cognizant Technology Solutions India">Cognizant Technology Solutions India</option>
             </optgroup>
             <optgroup label="Startup Companies">
               <option value="Zerodha">Zerodha</option>
               <option value="CRED">CRED</option>
-              <option value="Swiggy">Swiggy</option>
-              <option value="Zomato">Zomato</option>
-              <option value="BYJU’S">BYJU’S</option>
-              <option value="Unacademy">Unacademy</option>
-              <option value="Razorpay">Razorpay</option>
-              <option value="PhonePe">PhonePe</option>
-              <option value="Groww">Groww</option>
-              <option value="Meesho">Meesho</option>
-              <option value="Delhivery">Delhivery</option>
-              <option value="Nykaa">Nykaa</option>
-              <option value="OYO Rooms">OYO Rooms</option>
-              <option value="Boat">Boat</option>
-              <option value="Udaan">Udaan</option>
               <option value="Others">Others</option>
             </optgroup>
           </select>
-        </div>
-        {companyName === "Others" && (
-          <div className="col-md-3">
+          {companyName === "Others" && (
             <input
               type="text"
-              className="form-control"
+              className="form-input"
               placeholder="Enter Company Name"
               value={customCompanyName}
               onChange={(e) => setCustomCompanyName(e.target.value)}
             />
-          </div>
-        )}
-        <div className="col-md-2">
+          )}
           <input
             type="number"
             step="0.1"
-            className="form-control"
+            className="form-input"
             placeholder="CTC (LPA)"
             value={packageCTC}
             onChange={(e) => setPackageCTC(e.target.value)}
           />
-        </div>
-        <div className="col-md-2">
           <input
             type="text"
-            className="form-control"
+            className="form-input"
             placeholder="Role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
           />
-        </div>
-        <div className="col-md-3">
           <input
             type="text"
-            className="form-control"
-            placeholder="Job Description"
+            className="form-input"
+            placeholder="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-        </div>
-        <div className="col-md-2">
-          <button className="btn btn-success" onClick={handleAddPlacement}>
-            ADD
+          <button className="add-btn" onClick={handleAddPlacement}>
+            Add
           </button>
-        </div>
-      </div>
-
-      <div className="row g-2 mb-3">
-        <div className="col-md-12">
-          <div className="alert alert-info">
-            <strong>Selected Students:</strong> {selectedStudents.length > 0 ? selectedStudents.join(', ') : 'None selected'}
-          </div>
         </div>
       </div>
 

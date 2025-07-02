@@ -1,223 +1,392 @@
-/* PlacementDashboard.css */
+/* Base Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #e0f7fa, #f0f4f8);
+  min-height: 100vh;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* Dashboard Container */
 .placement-dashboard {
-  font-family: 'Inter', sans-serif;
-  background-color: #f8fafc;
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 2rem;
 }
 
-.container {
-  max-width: 1200px;
-  margin: auto;
-}
-
-.card {
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  border: none;
+/* Header Section */
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 2rem;
-  overflow: hidden;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0e0e0;
 }
 
-.card-header {
-  background-color: #667eea;
+.welcome-text h2 {
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.logout-btn {
+  padding: 0.6rem 1.2rem;
+  background-color: #e74c3c;
   color: white;
-  font-weight: bold;
-  padding: 1rem 1.5rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background-color: #c0392b;
+  transform: translateY(-2px);
+}
+
+/* Filter Controls Row */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+/* Dropdown Select */
+.filter-dropdown {
+  padding: 0.6rem 1rem;
+  border: 2px solid #bdc3c7;
+  border-radius: 12px;
+  background: white;
+  color: #2c3e50;
+  font-size: 14px;
+  min-width: 200px;
+  max-width: 300px;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-dropdown:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.25);
 }
 
 /* Filter Buttons */
 .filter-buttons {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background-color: #ce2c2c;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  gap: 0.4rem;
 }
 
-.custom-filter-btn {
-  font-size: 14px;
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid #3498db;
+  background: white;
+  color: #3498db;
+  border-radius: 12px;
+  cursor: pointer;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 8px 16px;
-  border-radius: 8px;
   transition: all 0.3s ease;
-  cursor: pointer;
-  min-width: 100px;
-  text-align: center;
-  border: 2px solid transparent;
-  background-color: #e0e7ff; /* 🟦 Soft pastel blue background */
-  color: #b81db6; /* Darker blue text */
-  border-color: transparent;
 }
 
-/* Hover effect - switch to strong blue */
-.custom-filter-btn:hover {
-  background-color: #46e583; /* Deep indigo */
+.filter-btn.active,
+.filter-btn:hover {
+  background: #3498db;
   color: white;
-  border-color: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.download-btn {
+  padding: 0.6rem 1.2rem;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.download-btn:hover {
+  background: #219150;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
-/* Active state - same as hover */
-.custom-filter-btn.active {
-  background-color: #60f792;
-  color: white;
-  border-color: #4f46e5;
-  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
-}
-/* Download Button */
-.btn-custom-download {
-  background-color: #d1fae5;
-  color: #add839;
-  border: 2px solid #3920db;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-}
-
-.btn-custom-download:hover {
-  background-color: #10b981;
-  color: white;
-  border-color: #065f46;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
-}
-
-/* Section & Company Filters */
-.form-select-sm {
-  font-size: 14px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-}
-
-/* Student Table */
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.table th,
-.table td {
-  padding: 12px 16px;
-  vertical-align: middle;
-  text-align: left;
-}
-
-.table thead {
-  background-color: #e0e7ff;
-  color: #1e40af;
-}
-
-.table tbody tr:hover {
-  background-color: #f1f5f9;
-}
-
-.table-bordered th,
-.table-bordered td {
-  border: 1px solid #dee2e6;
-}
-
-/* Checkbox Styling */
-input[type="checkbox"] {
-  transform: scale(1.2);
-  cursor: pointer;
-}
-
-/* Selected Students Info */
-.alert-info {
-  background-color: #dbecff;
-  color: #1e40af;
-  border-left: 4px solid #667eea;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-/* Add Company Form */
-.add-company-form {
-  padding: 1rem;
-  background-color: #f9fafb;
-  border-radius: 10px;
+/* Students Table Section */
+.students-section {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
 }
 
-.add-company-form .form-control,
-.add-company-form .form-select {
-  border-radius: 6px;
-  border: 1px solid #ced4da;
-  padding: 10px;
+.table-container {
+  overflow-x: auto;
+}
+
+.students-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+}
+
+.students-table thead {
+  background: #34495e;
+}
+
+.students-table thead th {
+  color: white;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
   font-size: 14px;
 }
 
-.add-company-form .btn-success {
-  background-color: #10b981;
-  border: none;
-  padding: 10px 20px;
+.students-table tbody td {
+  padding: 1rem;
+  background: white;
+  border-bottom: 1px solid #ecf0f1;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.students-table tbody tr:hover td {
+  background: #f0f8ff;
+}
+
+.students-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.students-table a {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.students-table a:hover {
+  text-decoration: underline;
+}
+
+/* Add Placement Section */
+.add-placement-section {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
+}
+
+.add-placement-section h3 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 600;
-  border-radius: 6px;
 }
 
-.add-company-form .btn-success:hover {
-  background-color: #065f46;
+.placement-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+}
+
+.form-input {
+  flex: 1;
+  min-width: 150px;
+  padding: 0.7rem 1rem;
+  border: 2px solid #bdc3c7;
+  border-radius: 12px;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.form-input::placeholder {
+  color: #95a5a6;
+}
+
+.add-btn {
+  padding: 0.7rem 1.5rem;
+  background: #27ae60;
   color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
-/* Company List */
-.badge.bg-warning {
-  background-color: #fef9c3;
-  color: #7a5d00;
+.add-btn:hover {
+  background: #219150;
+  transform: translateY(-2px);
 }
 
-.badge.bg-primary {
-  background-color: #3b82f6;
-  color: white;
+/* Filter Information */
+.filter-info {
+  background: #e8f4fd;
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.filter-info p {
+  margin: 0;
+}
+
+/* Loading & Error States */
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+  color: #7f8c8d;
+}
+
+.error-state {
+  color: #e74c3c;
 }
 
 /* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 500px;
+  margin: 1rem auto;
+}
+
 .modal-content {
-  border-radius: 12px;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .modal-header {
-  border-bottom: 1px solid #dee2e6;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 1rem 1.5rem;
+}
+
+.modal-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 1.5rem;
 }
 
 .modal-footer {
-  border-top: 1px solid #dee2e6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
 }
 
-/* Password Change Modal */
-.modal-body input {
-  margin-bottom: 1rem;
+.modal-footer .btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 500;
+  cursor: pointer;
 }
 
-/* Responsive Layout */
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-  .filter-buttons {
+  .placement-form {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .custom-filter-btn {
-    width: 100%;
+  .form-input {
+    min-width: 100%;
   }
 
-  .btn-custom-download {
-    width: 100%;
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+
+  .filter-dropdown {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .filter-buttons {
     justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .students-table thead th,
+  .students-table tbody td {
+    font-size: 12px;
+    padding: 0.75rem;
   }
 }
