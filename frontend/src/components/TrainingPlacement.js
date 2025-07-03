@@ -88,14 +88,25 @@ const TrainingPlacement = () => {
   useEffect(() => {
     if (filterCompany) {
       setFilter('all');
+      // Clear manual department/section filters when company is selected
+      // since company department filtering takes precedence
+      setFilterDepartment('');
+      setFilterSection('');
     }
   }, [filterCompany]);
 
   useEffect(() => {
-    if (filterDepartment || filterSection) {
+    if (filterDepartment) {
+      setFilterSection(''); // Clear section when department changes
       setFilter('all');
     }
-  }, [filterDepartment, filterSection]);
+  }, [filterDepartment]);
+
+  useEffect(() => {
+    if (filterSection) {
+      setFilter('all');
+    }
+  }, [filterSection]);
 
   const handleAddPlacement = async () => {
     const finalCompanyName = companyName === "Others" ? customCompanyName : companyName;
@@ -152,7 +163,7 @@ const TrainingPlacement = () => {
   };
 
   const handleDownloadExcel = () => {
-    const exportData = studentPlacements.map((s, idx) => ({
+    const exportData = filteredStudents.map((s, idx) => ({
       "#": idx + 1,
       Name: s.name,
       UID: s.UID,
@@ -161,13 +172,21 @@ const TrainingPlacement = () => {
       MailID: s.mailid,
       Mobile: s.mobile,
       Relocate: s.relocate ? "Yes" : "No",
-      ResumeURL: s.resumeUrl ? `http://localhost:5000${s.resumeUrl}` : "-"
+      ResumeURL: s.resumeUrl ? `http://localhost:5000${s.resumeUrl}` : "-",
+      AppliedStatus: filterCompany
+        ? hasStudentAppliedToCompany(s.UID, filterCompany) ? "Applied" : "Not Applied"
+        : hasStudentAnyApplication(s.UID) ? "Applied" : "Not Applied"
     }));
+    
+    const fileName = filterCompany 
+      ? `${filterCompany.replace(/[^a-zA-Z0-9]/g, '_')}_students.xlsx`
+      : "placements.xlsx";
+    
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Placements");
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "placements.xlsx");
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
   };
 
   const handleStudentSelect = (uid) => {
@@ -198,6 +217,11 @@ const TrainingPlacement = () => {
     return applications.some(app => app.studentUID === studentUID.toString());
   };
 
+  const getCompanyDepartment = (companyName) => {
+    const company = companies.find(c => c.companyName === companyName);
+    return company ? company.department : 'ALL';
+  };
+
   const getFilteredStudents = () => {
     let filteredByDepartment = studentPlacements;
     if (filterDepartment) {
@@ -207,21 +231,31 @@ const TrainingPlacement = () => {
     if (filterSection) {
       filteredBySection = filteredByDepartment.filter(s => s.section === filterSection);
     }
+    
+    // Filter by company department targeting
+    let filteredByCompanyDepartment = filteredBySection;
+    if (filterCompany) {
+      const selectedCompany = companies.find(c => c.companyName === filterCompany);
+      if (selectedCompany && selectedCompany.department !== 'ALL') {
+        filteredByCompanyDepartment = filteredBySection.filter(s => s.department === selectedCompany.department);
+      }
+    }
+    
     if (filterCompany) {
       if (filter === "applied") {
-        return filteredBySection.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
+        return filteredByCompanyDepartment.filter((s) => hasStudentAppliedToCompany(s.UID, filterCompany));
       } else if (filter === "not_applied") {
-        return filteredBySection.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
+        return filteredByCompanyDepartment.filter((s) => !hasStudentAppliedToCompany(s.UID, filterCompany));
       } else {
-        return filteredBySection;
+        return filteredByCompanyDepartment;
       }
     } else {
       if (filter === "applied") {
-        return filteredBySection.filter((s) => hasStudentAnyApplication(s.UID));
+        return filteredByCompanyDepartment.filter((s) => hasStudentAnyApplication(s.UID));
       } else if (filter === "not_applied") {
-        return filteredBySection.filter((s) => !hasStudentAnyApplication(s.UID));
+        return filteredByCompanyDepartment.filter((s) => !hasStudentAnyApplication(s.UID));
       } else {
-        return filteredBySection;
+        return filteredByCompanyDepartment;
       }
     }
   };
@@ -289,6 +323,7 @@ const TrainingPlacement = () => {
             className="filter-dropdown"
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
+            disabled={filterCompany}
           >
             <option value="">-- All Departments --</option>
             {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
@@ -299,11 +334,19 @@ const TrainingPlacement = () => {
             className="filter-dropdown"
             value={filterSection}
             onChange={(e) => setFilterSection(e.target.value)}
+            disabled={!filterDepartment || filterCompany}
           >
             <option value="">-- All Sections --</option>
-            {[...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
-              <option key={section} value={section}>{section}</option>
-            ))}
+            {filterDepartment ? 
+              [...new Set(studentPlacements
+                .filter(s => s.department === filterDepartment)
+                .map(s => s.section))].sort().map((section) => (
+                <option key={section} value={section}>{section}</option>
+              )) :
+              [...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+                <option key={section} value={section}>{section}</option>
+              ))
+            }
           </select>
           <select
             className="filter-dropdown"
@@ -311,12 +354,18 @@ const TrainingPlacement = () => {
             onChange={(e) => setFilterCompany(e.target.value)}
           >
             <option value="">-- Filter by Company --</option>
-            {[...new Set(companies.map(c => c.companyName))].map((companyName) => (
-              <option key={companyName} value={companyName}>{companyName}</option>
-            ))}
+            {[...new Set(companies.map(c => c.companyName))].sort().map((companyName) => {
+              const company = companies.find(c => c.companyName === companyName);
+              const deptLabel = company?.department === 'ALL' ? 'All Depts' : company?.department || 'Unknown';
+              return (
+                <option key={companyName} value={companyName}>
+                  {companyName} ({deptLabel})
+                </option>
+              );
+            })}
           </select>
         </div>
-        <div className="filters-row">
+        <div className="filters-row-right">
           <div className="filter-buttons">
             <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter("all")}>All Students</button>
             <button className={`filter-btn ${filter === 'applied' ? 'active' : ''}`} onClick={() => setFilter("applied")}>Applied</button>
@@ -326,6 +375,16 @@ const TrainingPlacement = () => {
             Download Excel
           </button>
         </div>
+        {filterCompany && (
+          <div className="filter-info">
+            <span className="filter-info-text">
+              Showing students for: <strong>{filterCompany}</strong> 
+              {getCompanyDepartment(filterCompany) !== 'ALL' && (
+                <span> (Department: <strong>{getCompanyDepartment(filterCompany)}</strong>)</span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="dashboard-card fadeInUp">
