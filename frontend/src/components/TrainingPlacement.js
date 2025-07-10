@@ -96,6 +96,10 @@ const TrainingPlacement = () => {
       alert("Please enter a custom company name.");
       return;
     }
+    if (selectedStudents.length === 0) {
+      alert("Please select at least one student before adding a company.");
+      return;
+    }
     try {
       const payload = {
         companyName: finalCompanyName,

@@ -50,6 +50,7 @@ const PlacementDashboard = () => {
       );
       const data = Array.isArray(res.data) ? res.data : [];
       setStudentPlacements(data);
+      console.log('Fetched studentPlacements:', data.map(s => s.section)); // Debug: see sections present
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to load data.");
@@ -121,6 +122,10 @@ const PlacementDashboard = () => {
     }
     if (!coordinator?.department) {
       alert("Department information is missing.");
+      return;
+    }
+    if (selectedStudents.length === 0) {
+      alert("Please select at least one student before adding a company.");
       return;
     }
     try {
