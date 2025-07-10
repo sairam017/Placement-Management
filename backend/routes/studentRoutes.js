@@ -3,17 +3,20 @@ const router = express.Router();
 const studentController = require("../controllers/studentController");
 const authMiddleware = require("../middleware/authMiddleware");
 
-// Create student
-router.post("/create", studentController.createStudent);
+// Create student (Admin only)
+router.post("/create", authMiddleware.verifyToken, studentController.createStudent);
+
+// Bulk create students (Admin only)
+router.post("/bulk", authMiddleware.verifyToken, studentController.bulkCreateStudents);
 
 // Login
 router.post("/login", studentController.loginStudent);
 
-// Get all students
-router.get("/all", studentController.getAllStudents);
+// Get all students (Admin only)
+router.get("/all", authMiddleware.verifyToken, studentController.getAllStudents);
 
-// Get by UID
-router.get("/uid/:uid", studentController.getStudentByUID);
+// Get by UID (Admin only)
+router.get("/uid/:uid", authMiddleware.verifyToken, studentController.getStudentByUID);
 
 // Get students by department (for dashboard)
 router.get("/department/:department", studentController.getStudentsByDepartment);

@@ -84,6 +84,7 @@ const PlacementDashboard = () => {
       const res = await axios.get(`http://localhost:5000/api/applications/department/${coordinator.department}`);
       if (res.data.success) {
         setApplications(res.data.data);
+        console.log('Fetched applications:', res.data.data); // Debug: see applications
       }
     } catch (err) {
       console.error('Error fetching department applications:', err);
@@ -187,13 +188,15 @@ const PlacementDashboard = () => {
   };
 
   const hasStudentAppliedToCompany = (studentUID, companyName) => {
+    // Ensure both UIDs are compared as strings for consistency
     return applications.some(app => 
-      app.studentUID === studentUID.toString() && app.companyName === companyName
+      String(app.studentUID) === String(studentUID) && app.companyName === companyName
     );
   };
 
   const hasStudentAnyApplication = (studentUID) => {
-    return applications.some(app => app.studentUID === studentUID.toString());
+    // Ensure both UIDs are compared as strings for consistency
+    return applications.some(app => String(app.studentUID) === String(studentUID));
   };
 
   const getFilteredStudents = () => {

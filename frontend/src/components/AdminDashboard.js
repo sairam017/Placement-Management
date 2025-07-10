@@ -1,14 +1,437 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import Papa from 'papaparse'; // Import papaparse
+import Papa from 'papaparse';
 import { useNavigate } from 'react-router-dom';
-import StudentRegisterForm from './StudentRegisterForm';
-import PlacementCoordinatorForm from './PlacementCoordinator';
-import TrainingPlacementRegisterForm from './TrainingPlacementRegisterForm';
 import './AdminDashboard.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import Footer from './footer/Footer';
 
-const AdminPage = () => {
+const StudentRegisterForm = ({ onSuccess }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    UID: '',
+    department: '',
+    section: '',
+    password: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uidError, setUidError] = useState('');
+  const [isCheckingUID, setIsCheckingUID] = useState(false);
+
+  // Debounced UID validation
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.UID.trim() && formData.UID.length > 2) {
+        validateUID(formData.UID.trim());
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.UID]);
+
+  const validateUID = async (uid) => {
+    setIsCheckingUID(true);
+    try {
+      const uidExists = await checkUIDExists(uid);
+      if (uidExists) {
+        setUidError(`UID "${uid}" already exists. Please choose a different UID.`);
+      } else {
+        setUidError('');
+      }
+    } catch (error) {
+      console.error('UID validation error:', error);
+      // Don't show error for validation, just log it
+    } finally {
+      setIsCheckingUID(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear UID error when user starts typing
+    if (name === 'UID') {
+      setUidError('');
+    }
+  };
+
+  const checkUIDExists = async (uid) => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/students/uid/${uid}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      return response.data.data !== null;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return false; // UID doesn't exist, which is good
+      }
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Basic validation
+      if (!formData.UID.trim()) {
+        setUidError('UID is required');
+        return;
+      }
+      
+      if (uidError) {
+        // Don't submit if there's already a UID error
+        return;
+      }
+      
+      // If password is empty, set a default password based on UID
+      const submissionData = {
+        ...formData,
+        UID: formData.UID.trim(),
+        name: formData.name.trim(),
+        department: formData.department.trim(),
+        section: formData.section.trim(),
+        password: formData.password.trim() || `student_${formData.UID.trim()}`
+      };
+      
+      const response = await axios.post('http://localhost:5000/api/students/create', submissionData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      
+      if (response.data.success) {
+        alert(`✅ Student registered successfully!\nUID: ${submissionData.UID}\nName: ${submissionData.name}`);
+        setFormData({
+          name: '',
+          UID: '',
+          department: '',
+          section: '',
+          password: ''
+        });
+        setUidError('');
+        onSuccess();
+      } else {
+        throw new Error(response.data.message || 'Registration failed');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      let errorMessage = 'Server error';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Handle specific error cases
+      if (errorMessage.includes('UID already taken') || errorMessage.includes('already exists')) {
+        setUidError(errorMessage);
+      } else if (errorMessage.includes('Access denied')) {
+        alert('❌ Access denied. Please make sure you are logged in as an admin.');
+      } else {
+        alert('❌ Error registering student: ' + errorMessage);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 bg-light rounded-lg">
+      <div className="mb-3">
+        <label className="form-label">Full Name</label>
+        <input
+          type="text"
+          className="form-control"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">UID</label>
+        <div className="input-group">
+          <input
+            type="text"
+            className={`form-control ${uidError ? 'is-invalid' : ''}`}
+            name="UID"
+            value={formData.UID}
+            onChange={handleChange}
+            required
+          />
+          {isCheckingUID && (
+            <span className="input-group-text">
+              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            </span>
+          )}
+        </div>
+        {uidError && (
+          <div className="invalid-feedback d-block">
+            {uidError}
+          </div>
+        )}
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Department</label>
+        <input
+          type="text"
+          className="form-control"
+          name="department"
+          value={formData.department}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Section</label>
+        <input
+          type="text"
+          className="form-control"
+          name="section"
+          value={formData.section}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Password</label>
+        <input
+          type="password"
+          className="form-control"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Leave blank for default password"
+        />
+      </div>
+      <button 
+        type="submit" 
+        className="btn btn-primary w-100" 
+        disabled={isSubmitting || !!uidError}
+      >
+        {isSubmitting ? (
+          <>
+            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Registering...
+          </>
+        ) : (
+          'Register Student'
+        )}
+      </button>
+    </form>
+  );
+};
+
+const PlacementCoordinatorForm = ({ onSuccess }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    employeeId: '',
+    department: '',
+    email: '',
+    password: ''
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('http://localhost:5000/api/coordinators', formData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      alert('Placement Coordinator registered successfully!');
+      setFormData({
+        name: '',
+        employeeId: '',
+        department: '',
+        email: '',
+        password: ''
+      });
+      onSuccess();
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('Error registering coordinator: ' + (error.response?.data?.message || 'Server error'));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 bg-light rounded-lg">
+      <div className="mb-3">
+        <label className="form-label">Full Name</label>
+        <input
+          type="text"
+          className="form-control"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Employee ID</label>
+        <input
+          type="text"
+          className="form-control"
+          name="employeeId"
+          value={formData.employeeId}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Department</label>
+        <input
+          type="text"
+          className="form-control"
+          name="department"
+          value={formData.department}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Email</label>
+        <input
+          type="email"
+          className="form-control"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Password</label>
+        <input
+          type="password"
+          className="form-control"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <button type="submit" className="btn btn-secondary w-100">
+        Register Coordinator
+      </button>
+    </form>
+  );
+};
+
+const TrainingPlacementRegisterForm = ({ onSuccess }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    employeeId: '',
+    email: '',
+    password: ''
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('http://localhost:5000/api/tpos', formData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      alert('TPO registered successfully!');
+      setFormData({
+        name: '',
+        employeeId: '',
+        email: '',
+        password: ''
+      });
+      onSuccess();
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('Error registering TPO: ' + (error.response?.data?.message || 'Server error'));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 bg-light rounded-lg">
+      <div className="mb-3">
+        <label className="form-label">Full Name</label>
+        <input
+          type="text"
+          className="form-control"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Employee ID</label>
+        <input
+          type="text"
+          className="form-control"
+          name="employeeId"
+          value={formData.employeeId}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Email</label>
+        <input
+          type="email"
+          className="form-control"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Password</label>
+        <input
+          type="password"
+          className="form-control"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+        />
+      </div>
+      <button type="submit" className="btn btn-success w-100">
+        Register TPO
+      </button>
+    </form>
+  );
+};
+
+const AdminDashboard = () => {
   const navigate = useNavigate();
+  
   const [students, setStudents] = useState([]);
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [pcs, setPCs] = useState([]);
@@ -20,12 +443,10 @@ const AdminPage = () => {
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [showPCForm, setShowPCForm] = useState(false);
   const [showTPOForm, setShowTPOForm] = useState(false);
-  const [isFormCollapsed, setIsFormCollapsed] = useState(false);
-  const [tableHeight, setTableHeight] = useState('calc(100vh - 300px)');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Auto-close form after successful submission
   const handleFormSuccess = (formType) => {
-    switch(formType) {
+    switch (formType) {
       case 'student':
         setShowStudentForm(false);
         fetchStudents();
@@ -43,38 +464,6 @@ const AdminPage = () => {
     }
   };
 
-  // Dynamic table height calculation based on form visibility
-  useEffect(() => {
-    const calculateTableHeight = () => {
-      const baseHeight = window.innerHeight;
-      let headerHeight = 250; // Header + nav + margins
-      let formHeight = 0;
-      let actionHeight = 100; // Action buttons + padding
-      let padding = 50; // Extra safety padding
-      
-      // Adjust form height based on what's visible
-      if (activeTab === 'student' && showStudentForm) {
-        formHeight = 280;
-      } else if (activeTab === 'pc' && showPCForm) {
-        formHeight = 280;
-      } else if (activeTab === 'tpo' && showTPOForm) {
-        formHeight = 280;
-      }
-      
-      // Calculate available height
-      const availableHeight = baseHeight - headerHeight - formHeight - actionHeight - padding;
-      const finalHeight = Math.max(350, Math.min(availableHeight, baseHeight * 0.6));
-      
-      setTableHeight(`${finalHeight}px`);
-    };
-
-    calculateTableHeight();
-    window.addEventListener('resize', calculateTableHeight);
-    
-    return () => window.removeEventListener('resize', calculateTableHeight);
-  }, [showStudentForm, showPCForm, showTPOForm, activeTab]);
-
-  // Check authentication on component mount
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     const storedAdminData = localStorage.getItem('adminData');
@@ -88,7 +477,10 @@ const AdminPage = () => {
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('adminToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
   };
 
   const handleLogout = () => {
@@ -98,935 +490,665 @@ const AdminPage = () => {
   };
 
   const fetchStudents = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/students/all');
-      setStudents(res.data.data || []);
-    } catch {
+      const res = await axios.get('http://localhost:5000/api/students/all', {
+        headers: getAuthHeaders()
+      });
+      const studentsData = res.data.data || [];
+      const normalizedStudents = studentsData.map(student => ({
+        ...student,
+        name: student.name?.trim() || 'UNKNOWN_NAME',
+        UID: student.UID?.trim() || 'UNKNOWN_UID',
+        department: student.department ? student.department.trim().toUpperCase() : 'UNKNOWN',
+        section: student.section?.trim() || 'UNKNOWN_SECTION',
+      }));
+      setStudents(normalizedStudents);
+      setFilteredStudents(normalizedStudents);
+      setStudentFilter('all');
+      setUidSearch('');
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      alert('Error fetching students: ' + (error.response?.data?.message || 'Server error'));
       setStudents([]);
+      setFilteredStudents([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   const fetchPCs = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/coordinators/coordinators');
+      const res = await axios.get('http://localhost:5000/api/coordinators/coordinators', {
+        headers: getAuthHeaders()
+      });
       setPCs(res.data.data || []);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching coordinators:', error);
+      alert('Error fetching coordinators: ' + (error.response?.data?.message || 'Server error'));
       setPCs([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   const fetchTPOs = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/tpos');
+      const res = await axios.get('http://localhost:5000/api/tpos', {
+        headers: getAuthHeaders()
+      });
       setTPOs(res.data.data || []);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching TPOs:', error);
+      alert('Error fetching TPOs: ' + (error.response?.data?.message || 'Server error'));
       setTPOs([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   const filterStudents = useCallback(() => {
-    let filtered = students;
-    
-    // Filter by department
-    if (studentFilter !== 'all') {
-      filtered = filtered.filter(student =>
-        student.department?.toLowerCase() === studentFilter.toLowerCase()
-      );
+    if (!Array.isArray(students) || students.length === 0) {
+      setFilteredStudents([]);
+      return;
     }
-    
-    // Filter by UID search
-    if (uidSearch.trim()) {
+    let filtered = [...students];
+    if (studentFilter && studentFilter !== 'all') {
+      filtered = filtered.filter(student => student.department === studentFilter);
+    }
+    if (uidSearch && uidSearch.trim()) {
       filtered = filtered.filter(student =>
         student.UID?.toLowerCase().includes(uidSearch.trim().toLowerCase())
       );
     }
-    
     setFilteredStudents(filtered);
   }, [students, studentFilter, uidSearch]);
 
-  const getUniqueDepartments = () => {
-    const departments = [...new Set(students.map(s => s.department).filter(d => d))];
-    return departments.sort();
-  };
+  const getUniqueDepartments = useCallback(() => {
+    if (!Array.isArray(students)) return [];
+    return [...new Set(students.map(s => s.department).filter(d => d && d !== 'UNKNOWN'))].sort();
+  }, [students]);
 
   useEffect(() => {
-    if (activeTab === 'student') fetchStudents();
-    else if (activeTab === 'pc') fetchPCs();
-    else if (activeTab === 'tpo') fetchTPOs();
+    if (activeTab === 'student') {
+      fetchStudents();
+    } else if (activeTab === 'pc') {
+      fetchPCs();
+    } else if (activeTab === 'tpo') {
+      fetchTPOs();
+    }
   }, [activeTab, fetchStudents, fetchPCs, fetchTPOs]);
 
   useEffect(() => {
     filterStudents();
-  }, [filterStudents]);
+  }, [students, studentFilter, uidSearch, filterStudents]);
 
-  const deleteStudent = async (uid) => {
-    if (window.confirm('Are you sure you want to delete this student?')) {
-      try {
-        await axios.delete(`http://localhost:5000/api/students/${uid}`, {
-          headers: getAuthHeaders()
-        });
-        alert('Student deleted successfully');
-        fetchStudents();
-      } catch (error) {
-        console.error('Delete student error:', error);
-        alert('Error deleting student: ' + (error.response?.data?.message || 'Server error'));
-      }
-    }
-  };
-
-  const deletePC = async (employeeId) => {
-    if (window.confirm('Are you sure you want to delete this Placement Coordinator?')) {
-      try {
-        await axios.delete(`http://localhost:5000/api/coordinators/${employeeId}`, {
-          headers: getAuthHeaders()
-        });
-        alert('Placement Coordinator deleted successfully');
-        fetchPCs();
-      } catch (error) {
-        console.error('Delete PC error:', error);
-        alert('Error deleting Placement Coordinator: ' + (error.response?.data?.message || 'Server error'));
-      }
-    }
-  };
-
-  const deleteTPO = async (tpoId) => {
-    if (window.confirm('Are you sure you want to delete this Training & Placement Officer?')) {
-      try {
-        await axios.delete(`http://localhost:5000/api/tpos/${tpoId}`, {
-          headers: getAuthHeaders()
-        });
-        alert('Training & Placement Officer deleted successfully');
-        fetchTPOs();
-      } catch (error) {
-        console.error('Delete TPO error:', error);
-        alert('Error deleting TPO: ' + (error.response?.data?.message || 'Server error'));
-      }
-    }
-  };
-
-  // Handle Bulk Upload
   const handleBulkUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // Check file type
+    
     const fileExtension = file.name.split('.').pop().toLowerCase();
     const allowedExtensions = ['csv', 'xlsx', 'xls'];
-    
     if (!allowedExtensions.includes(fileExtension)) {
       alert('Please upload a valid CSV or Excel file (.csv, .xlsx, .xls)');
-      e.target.value = ''; // Reset file input
+      e.target.value = '';
       return;
     }
-
-    // For now, only handle CSV files (Excel support would require additional library)
+    
     if (fileExtension !== 'csv') {
       alert('Currently only CSV files are supported. Please convert your Excel file to CSV format.');
-      e.target.value = ''; // Reset file input
+      e.target.value = '';
       return;
     }
 
+    setIsLoading(true);
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => header.trim(), // Remove extra spaces from headers
+      transformHeader: (header) => header.trim(),
+      transform: (value) => value?.trim(),
       complete: async (results) => {
         try {
-          // Check if file has data
           if (!results.data || results.data.length === 0) {
             alert('The uploaded file appears to be empty or has no valid data.');
             return;
           }
-
+          
           const requiredFields = ['Full Name', 'UID', 'Department', 'Section'];
           const csvHeaders = Object.keys(results.data[0] || {});
-
           const missingFields = requiredFields.filter(field => !csvHeaders.includes(field));
+          
           if (missingFields.length > 0) {
-            alert(`Missing required columns: ${missingFields.join(', ')}\n\nRequired columns are:\n- Full Name\n- UID\n- Department\n- Section\n- Password (optional)`);
+            alert(`Missing required columns: ${missingFields.join(', ')}\n\nRequired columns are:\n- Full Name\n- UID\n- Department\n- Section\n- Password (optional)\n\nFound columns: ${csvHeaders.join(', ')}`);
             return;
           }
-
-          // Filter out empty rows and validate data
-          const validData = results.data.filter(row => 
-            row['Full Name'] && row['Full Name'].trim() &&
-            row['UID'] && row['UID'].trim() &&
-            row['Department'] && row['Department'].trim() &&
-            row['Section'] && row['Section'].trim()
-          );
-
+          
+          const validData = results.data.filter((row) => {
+            return (
+              row['Full Name']?.trim() &&
+              row['UID']?.trim() &&
+              row['Department']?.trim() &&
+              row['Section']?.trim()
+            );
+          });
+          
           if (validData.length === 0) {
             alert('No valid student records found in the file. Please check that all required fields are filled.');
             return;
           }
-
+          
           const formattedData = validData.map(row => ({
             name: row['Full Name'].trim(),
             UID: row['UID'].trim(),
-            department: row['Department'].trim(),
+            department: row['Department'].trim().toUpperCase(),
             section: row['Section'].trim(),
-            password: row['Password'] ? row['Password'].trim() : `student_${row['UID'].trim()}`
+            password: row['Password'] ? row['Password'].trim() : `student_${row['UID'].trim()}`,
           }));
-
-          // Show confirmation before uploading
+          
           const confirmMessage = `Found ${formattedData.length} valid student records.\n\nProceed with bulk upload?`;
           if (!window.confirm(confirmMessage)) {
             return;
           }
-
-          const res = await axios.post('http://localhost:5000/api/students/bulk', formattedData, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...getAuthHeaders()
-            }
-          });
-
+          
+          const res = await axios.post(
+            'http://localhost:5000/api/students/bulk', 
+            formattedData,
+            { headers: getAuthHeaders() }
+          );
+          
           alert(`✅ Success! ${res.data.message}\n${res.data.insertedCount} students added successfully.`);
-          fetchStudents(); // Refresh student list
-          
-          // Reset file input
-          e.target.value = '';
-          
+          setStudentFilter('all');
+          setUidSearch('');
+          fetchStudents();
         } catch (error) {
           console.error('Bulk upload error:', error);
           let errorMessage = 'Unknown error occurred';
+          let detailedInfo = '';
           
           if (error.response) {
-            // Server responded with error status
             errorMessage = error.response.data?.message || `Server error (${error.response.status})`;
+            if (error.response.data?.errors) {
+              detailedInfo = '\n\nValidation Errors:\n' + error.response.data.errors.join('\n');
+            }
+            if (error.response.data?.processedCount !== undefined) {
+              detailedInfo += `\n\nProcessed: ${error.response.data.processedCount}/${error.response.data.totalCount} records`;
+            }
           } else if (error.request) {
-            // Request was made but no response received
             errorMessage = 'No response from server. Please check if the server is running.';
           } else {
-            // Something else happened
             errorMessage = error.message;
           }
           
-          alert('❌ Error uploading bulk data: ' + errorMessage);
-          e.target.value = ''; // Reset file input
+          alert('❌ Error uploading bulk data: ' + errorMessage + detailedInfo);
+        } finally {
+          setIsLoading(false);
+          e.target.value = '';
         }
       },
       error: (error) => {
         console.error('CSV parse error:', error);
         alert('❌ Error reading CSV file. Please check if the file is properly formatted.');
-        e.target.value = ''; // Reset file input
-      }
+        setIsLoading(false);
+        e.target.value = '';
+      },
     });
   };
 
+  const deleteStudent = async (uid) => {
+    if (!window.confirm('Are you sure you want to delete this student?')) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/students/${uid}`, {
+        headers: getAuthHeaders()
+      });
+      alert('Student deleted successfully');
+      fetchStudents();
+    } catch (error) {
+      console.error('Delete student error:', error);
+      alert('Error deleting student: ' + (error.response?.data?.message || 'Server error'));
+    }
+  };
+
+  const deletePC = async (employeeId) => {
+    if (!window.confirm('Are you sure you want to delete this Placement Coordinator?')) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/coordinators/${employeeId}`, {
+        headers: getAuthHeaders()
+      });
+      alert('Placement Coordinator deleted successfully');
+      fetchPCs();
+    } catch (error) {
+      console.error('Delete PC error:', error);
+      alert('Error deleting Placement Coordinator: ' + (error.response?.data?.message || 'Server error'));
+    }
+  };
+
+  const deleteTPO = async (tpoId) => {
+    if (!window.confirm('Are you sure you want to delete this Training & Placement Officer?')) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/tpos/${tpoId}`, {
+        headers: getAuthHeaders()
+      });
+      alert('Training & Placement Officer deleted successfully');
+      fetchTPOs();
+    } catch (error) {
+      console.error('Delete TPO error:', error);
+      alert('Error deleting TPO: ' + (error.response?.data?.message || 'Server error'));
+    }
+  };
+
   return (
-    <div className="admin-bg" style={{
-      margin: 0,
-      padding: 0,
-      height: '100vh',
-      width: '100vw',
-      overflow: 'hidden',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      backgroundColor: '#f8f9fa'
-    }}>
-      <div className="admin-dashboard-container animate-fade-in" style={{
-        height: '100%',
-        width: '100%',
-        margin: 0,
-        padding: '15px',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxSizing: 'border-box'
-      }}>
-        {/* Fixed Admin Header */}
-        <div className="admin-header-fixed" style={{
-          flexShrink: 0,
-          zIndex: 100,
-          backgroundColor: 'white',
-          borderBottom: '2px solid #dee2e6',
-          paddingBottom: '8px',
-          marginBottom: '0'
-        }}>
-          {adminData && (
-            <div className="admin-header" style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: '12px', 
-              padding: '10px 15px', 
-              backgroundColor: '#f8f9fa', 
-              borderRadius: '6px',
-              border: '1px solid #dee2e6'
-            }}>
-              <div>
-                <h4 style={{ margin: 0, color: '#28a745', fontSize: '18px' }}>
-                  Welcome, {adminData.name}
-                </h4>
-                <small style={{ color: '#6c757d', fontSize: '12px' }}>
-                  UID: {adminData.uid} | Role: {adminData.role}
-                </small>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="btn btn-outline-danger btn-sm"
-                style={{ minWidth: '70px', padding: '4px 8px', fontSize: '12px' }}
-              >
-                Logout
-              </button>
-            </div>
-          )}
-          
-          <div className="dashboard-title-section" style={{ textAlign: 'center', marginBottom: '15px' }}>
-            <h1 className="dashboard-main-title" style={{ 
-              fontSize: '24px', 
-              fontWeight: '800', 
-              color: '#2d3748', 
-              margin: '0 0 5px 0',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
+    <div className="admin-bg">
+      <div className="admin-dashboard-container animate-fade-in">
+        {/* Logout Button in Top-Right Corner */}
+        <div className="logout-container">
+          <button onClick={handleLogout} className="logout-btn">
+            <i className="bi bi-box-arrow-right"></i> Logout
+          </button>
+        </div>
+
+        <div className="admin-header-fixed">
+          <div className="dashboard-title-section">
+            <h1 className="dashboard-main-title slide-in-left">
               System Administrator
             </h1>
-            <h2 className="dashboard-subtitle" style={{ 
-              fontSize: '16px', 
-              color: '#667eea', 
-              margin: '0 0 5px 0',
-              fontWeight: '600'
-            }}>
+            <h2 className="dashboard-subtitle slide-in-right">
               Admin Dashboard
             </h2>
           </div>
-          <div className="dashboard-tab-group" style={{ marginBottom: '8px' }}>
+          
+          {adminData && (
+            <div className="admin-header">
+              <div>
+                <h4 style={{ margin: 0, color: '#28a745', fontSize: '14px' }}>
+                  Welcome, {adminData.name}
+                </h4>
+                <small style={{ color: '#6c757d', fontSize: '11px' }}>
+                  UID: {adminData.uid} | Role: {adminData.role}
+                </small>
+              </div>
+            </div>
+          )}
+
+          <div className="dashboard-tab-group justify-content-center">
             <button
-              className={`dashboard-tab ${activeTab === 'student' ? 'active' : ''}`}
+              className={`dashboard-tab ${activeTab === 'student' ? 'active' : ''} tab-animate`}
               onClick={() => setActiveTab('student')}
-              style={{ padding: '8px 16px', fontSize: '14px' }}
             >
               Students
             </button>
             <button
-              className={`dashboard-tab ${activeTab === 'pc' ? 'active' : ''}`}
+              className={`dashboard-tab ${activeTab === 'pc' ? 'active' : ''} tab-animate`}
               onClick={() => setActiveTab('pc')}
-              style={{ padding: '8px 16px', fontSize: '14px' }}
             >
               Placement Coordinators
             </button>
             <button
-              className={`dashboard-tab ${activeTab === 'tpo' ? 'active' : ''}`}
+              className={`dashboard-tab ${activeTab === 'tpo' ? 'active' : ''} tab-animate`}
               onClick={() => setActiveTab('tpo')}
-              style={{ padding: '8px 16px', fontSize: '14px' }}
             >
               Training & Placement Officers
             </button>
           </div>
         </div>
 
-        {/* Content Area with controlled height */}
-        <div className="dashboard-content" style={{
-          flex: 1,
-          overflowY: 'auto',
-          paddingTop: '10px',
-          minHeight: 0
-        }}>
-          <hr style={{ margin: '0 0 10px 0' }} />
-        {activeTab === 'student' && (
-          <div className="enhanced-tab-content" style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: 'calc(100vh - 200px)',
-            gap: '10px',
-            overflow: 'hidden'
-          }}>
-            {/* Action Section - Always visible at top */}
-            <div className="enhanced-action-section" style={{
-              position: 'sticky',
-              top: '0',
-              backgroundColor: 'rgba(255, 255, 255, 0.98)',
-              backdropFilter: 'blur(15px)',
-              zIndex: 50,
-              padding: '10px 15px',
-              borderBottom: '1px solid #e2e8f0',
-              marginBottom: '0',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-              flexShrink: 0,
-              order: 0
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '10px',
-                marginBottom: '8px',
-                flexWrap: 'wrap'
-              }}>
-                <button 
-                  className={`add-btn primary form-collapse-btn ${showStudentForm ? 'form-open' : ''}`} 
-                  onClick={() => setShowStudentForm((v) => !v)} 
-                  style={{ padding: '6px 12px', fontSize: '13px', position: 'relative' }}
-                  data-form-status={showStudentForm ? 'open' : 'closed'}
-                >
-                  <span className="btn-icon">{showStudentForm ? '−' : '+'}</span>
-                  {showStudentForm ? 'Close Form' : 'Add Student'}
-                </button>
-
-                {/* Show Bulk Upload Button Only When Form is Open */}
-                {showStudentForm && (
-                  <div className="bulk-upload-container">
-                    <input 
-                      type="file" 
-                      accept=".csv,.xlsx,.xls"
-                      onChange={handleBulkUpload} 
-                      style={{ display: 'none' }}
-                      id="bulk-upload-input"
-                    />
-                    <button 
-                      className="upload-btn"
-                      onClick={() => document.getElementById('bulk-upload-input').click()}
-                      type="button"
-                      style={{ padding: '6px 12px', fontSize: '13px' }}
-                    >
-                      📁 Upload Bulk Data
-                    </button>
-                  </div>
-                )}
+        <div className="dashboard-content">
+          {isLoading && (
+            <div className="text-center py-4">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
               </div>
+              <p className="mt-2">Loading data...</p>
+            </div>
+          )}
 
-              <div className="filter-section" style={{ width: '100%' }}>
-                <div className="filter-row" style={{
-                  display: 'flex',
-                  gap: '15px',
-                  alignItems: 'center',
-                  marginBottom: '8px',
-                  flexWrap: 'wrap'
-                }}>
-                  <div className="filter-group" style={{ minWidth: '180px' }}>
-                    <label htmlFor="department-filter" className="filter-label" style={{ fontSize: '12px', marginBottom: '4px' }}>Department:</label>
-                    <select 
-                      id="department-filter"
-                      className="filter-select"
-                      value={studentFilter} 
-                      onChange={(e) => setStudentFilter(e.target.value)}
-                      style={{ padding: '4px 8px', fontSize: '13px' }}
+          {!isLoading && activeTab === 'student' && (
+            <div className="enhanced-tab-content">
+              <div className="enhanced-action-section">
+                <div className="d-flex align-items-center gap-3 flex-wrap justify-content-between">
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      className={`add-btn primary form-collapse-btn ${showStudentForm ? 'form-open' : ''}`}
+                      onClick={() => setShowStudentForm(v => !v)}
+                      data-form-status={showStudentForm ? 'open' : 'closed'}
+                      disabled={isLoading}
                     >
-                      <option value="all">All Departments</option>
-                      {getUniqueDepartments().map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="filter-group" style={{ minWidth: '220px' }}>
-                    <label htmlFor="uid-search" className="filter-label" style={{ fontSize: '12px', marginBottom: '4px' }}>Search UID:</label>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        id="uid-search"
-                        className="filter-input"
-                        placeholder="Enter UID..."
-                        value={uidSearch}
-                        onChange={(e) => setUidSearch(e.target.value)}
-                        style={{
-                          padding: '4px 8px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                          minWidth: '150px',
-                          marginRight: '6px'
-                        }}
-                      />
-                      {uidSearch && (
-                        <button
-                          onClick={() => setUidSearch('')}
-                          className="clear-search-btn"
-                          title="Clear search"
-                          style={{
-                            padding: '4px 8px',
-                            background: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 'bold'
-                          }}
+                      <span className="btn-icon">{showStudentForm ? '−' : '+'}</span>
+                      {showStudentForm ? 'Close Form' : 'Add Student'}
+                    </button>
+                    {showStudentForm && (
+                      <div className="bulk-upload-container">
+                        <input
+                          type="file"
+                          accept=".csv,.xlsx,.xls"
+                          onChange={handleBulkUpload}
+                          style={{ display: 'none' }}
+                          id="bulk-upload-input"
+                          disabled={isLoading}
+                        />
+                        <label
+                          htmlFor="bulk-upload-input"
+                          className="upload-btn btn btn-outline-primary"
                         >
-                          ✕
-                        </button>
-                      )}
+                          📁 Upload Bulk Data
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="d-flex align-items-center gap-3 flex-wrap">
+                    <div className="filter-group">
+                      <label htmlFor="department-filter" className="filter-label">
+                        Department:
+                      </label>
+                      <select
+                        id="department-filter"
+                        className="filter-select form-select form-select-sm"
+                        value={studentFilter}
+                        onChange={e => setStudentFilter(e.target.value)}
+                        disabled={isLoading}
+                      >
+                        <option value="all">All Departments</option>
+                        {getUniqueDepartments().map(dept => (
+                          <option key={dept} value={dept}>
+                            {dept}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="filter-group" style={{ minWidth: '180px' }}>
+                      <label htmlFor="uid-search" className="filter-label">
+                        Search UID:
+                      </label>
+                      <div className="d-flex align-items-center">
+                        <input
+                          type="text"
+                          id="uid-search"
+                          className="filter-input form-control form-control-sm"
+                          placeholder="Enter UID..."
+                          value={uidSearch}
+                          onChange={e => setUidSearch(e.target.value)}
+                          style={{ width: '140px', marginRight: '4px' }}
+                          disabled={isLoading}
+                        />
+                        {uidSearch && (
+                          <button
+                            onClick={() => setUidSearch('')}
+                            className="clear-search-btn btn btn-sm btn-outline-secondary"
+                            title="Clear search"
+                            disabled={isLoading}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="student-count" style={{ marginLeft: 'auto' }}>
-                    <span className="count-badge" style={{ fontSize: '12px' }}>
-                      {filteredStudents.length} of {students.length} students
-                      {uidSearch && ` (searching: "${uidSearch}")`}
-                      {studentFilter !== 'all' && ` (${studentFilter})`}
-                    </span>
-                  </div>
                 </div>
-                
-                {filteredStudents.length === 0 && (students.length > 0) && (
-                  <div style={{ 
-                    marginTop: '5px', 
-                    padding: '6px 10px', 
-                    backgroundColor: '#fff3cd', 
-                    border: '1px solid #ffeaa7', 
-                    borderRadius: '4px',
-                    color: '#856404',
-                    fontSize: '12px'
-                  }}>
+
+                {filteredStudents.length === 0 && students.length > 0 && (
+                  <div className="alert alert-warning mt-3 mb-0 py-2">
                     <strong>No students found</strong> matching your criteria.
                     {uidSearch && <span> Try a different UID.</span>}
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Form Section - Appears above table when open */}
-            {showStudentForm && (
-              <div className="reg-form-box enhanced animate-slide-in" style={{
-                marginBottom: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                border: '2px solid #007bff',
-                borderRadius: '12px',
-                padding: '15px',
-                boxShadow: '0 4px 15px rgba(0, 123, 255, 0.15)',
-                maxHeight: '260px',
-                overflowY: 'auto',
-                flexShrink: 0,
-                order: 1,
-                transition: 'all 0.3s ease'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h3 style={{ color: '#007bff', margin: '0', fontSize: '15px', fontWeight: '600' }}>
-                    📝 Add New Student
-                  </h3>
-                  <button
-                    onClick={() => setShowStudentForm(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '20px',
-                      color: '#6c757d',
-                      cursor: 'pointer',
-                      padding: '0',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Close Form"
-                  >
-                    ×
-                  </button>
-                </div>
-                <StudentRegisterForm onSuccess={() => handleFormSuccess('student')} />
-              </div>
-            )}
-
-            {/* Table Section - Maximum space utilization */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', order: 2 }}>
-              <h3 style={{ fontSize: '16px', margin: '0', fontWeight: '600', color: '#2d3748' }}>
-                📊 Student List
-              </h3>
-              <div className="student-count" style={{ fontSize: '12px' }}>
-                <span className="count-badge" style={{ 
-                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}>
-                  {filteredStudents.length} of {students.length} students
-                </span>
-              </div>
-            </div>
-            
-            <div className="enhanced-table-container table-section" style={{ 
-              flex: 1,
-              minHeight: '400px',
-              height: tableHeight,
-              maxHeight: tableHeight,
-              overflowY: 'auto',
-              overflowX: 'auto',
-              border: '1px solid #dee2e6',
-              borderRadius: '12px',
-              backgroundColor: 'white',
-              position: 'relative',
-              order: 3,
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              {filteredStudents.length === 0 && students.length === 0 ? (
-                <div className="table-loading">
-                  Loading students...
-                </div>
-              ) : filteredStudents.length === 0 ? (
-                <div style={{ 
-                  padding: '40px 20px', 
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  background: 'linear-gradient(135deg, #f9fafb, #f3f4f6)',
-                  borderRadius: '12px',
-                  margin: '20px'
-                }}>
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>🔍</div>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#374151' }}>No students found</h4>
-                  <p style={{ margin: '0', fontSize: '14px' }}>
-                    {uidSearch ? `No results for "${uidSearch}"` : 'Try adjusting your filters'}
-                  </p>
-                </div>
-              ) : (
-                <div style={{ 
-                  flex: 1,
-                  overflowY: 'auto',
-                  overflowX: 'auto',
-                  height: '100%'
-                }}>
-                  <table className="dashboard-table" style={{ 
-                    marginBottom: 0, 
-                    fontSize: '13px', 
-                    width: '100%',
-                    tableLayout: 'auto'
-                  }}>
-                    <thead style={{
-                      position: 'sticky',
-                      top: 0,
-                      backgroundColor: '#f8f9fa',
-                      zIndex: 10
-                    }}>
-                      <tr>
-                        <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>👤 Name</th>
-                        <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>🆔 UID</th>
-                        <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>🏢 Department</th>
-                        <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>📚 Section</th>
-                        <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151', textAlign: 'center' }}>⚡ Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredStudents.map((s, index) => (
-                        <tr key={s.UID} style={{
-                          backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb'
-                        }}>
-                          <td style={{ padding: '10px 16px', fontWeight: '500' }}>{s.name}</td>
-                          <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#6366f1' }}>{s.UID}</td>
-                          <td style={{ padding: '10px 16px' }}>{s.department}</td>
-                          <td style={{ padding: '10px 16px' }}>{s.section}</td>
-                          <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                            <button 
-                              className="delete-btn" 
-                              onClick={() => deleteStudent(s.UID)}
-                              title="Delete Student"
-                              style={{ 
-                                padding: '6px 12px', 
-                                fontSize: '11px',
-                                borderRadius: '8px',
-                                fontWeight: '600'
-                              }}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {showStudentForm && (
+                <div className="reg-form-box enhanced animate-slide-in mb-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h3 className="text-primary m-0 fs-6 fw-semibold">
+                      📝 Add New Student
+                    </h3>
+                    <button
+                      onClick={() => setShowStudentForm(false)}
+                      className="btn-close"
+                      title="Close Form"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <StudentRegisterForm onSuccess={() => handleFormSuccess('student')} />
                 </div>
               )}
-            </div>
-          </div>
-        )}
-        {activeTab === 'pc' && (
-          <div className="enhanced-tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div className="enhanced-action-section" style={{
-              position: 'sticky',
-              top: '0',
-              backgroundColor: 'rgba(255, 255, 255, 0.98)',
-              backdropFilter: 'blur(15px)',
-              zIndex: 50,
-              paddingTop: '12px',
-              paddingBottom: '12px',
-              borderBottom: '1px solid #e2e8f0',
-              marginBottom: '15px',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-              flexShrink: 0
-            }}>
-              <button 
-                className={`add-btn secondary form-collapse-btn ${showPCForm ? 'form-open' : ''}`} 
-                onClick={() => setShowPCForm((v) => !v)} 
-                style={{ padding: '6px 12px', fontSize: '13px', position: 'relative' }}
-                data-form-status={showPCForm ? 'open' : 'closed'}
-              >
-                <span className="btn-icon">{showPCForm ? '−' : '+'}</span>
-                {showPCForm ? 'Close Form' : 'Add Placement Coordinator'}
-              </button>
-            </div>
-            {showPCForm && (
-              <div className="reg-form-box enhanced animate-slide-in" style={{
-                marginBottom: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                border: '2px solid #6c757d',
-                borderRadius: '12px',
-                padding: '15px',
-                boxShadow: '0 4px 15px rgba(108, 117, 125, 0.15)',
-                maxHeight: '260px',
-                overflowY: 'auto',
-                flexShrink: 0,
-                order: 1
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h3 style={{ color: '#6c757d', margin: '0', fontSize: '15px', fontWeight: '600' }}>
-                    👥 Add New Placement Coordinator
-                  </h3>
-                  <button
-                    onClick={() => setShowPCForm(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '20px',
-                      color: '#6c757d',
-                      cursor: 'pointer',
-                      padding: '0',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Close Form"
-                  >
-                    ×
-                  </button>
-                </div>
-                <PlacementCoordinatorForm onSuccess={() => handleFormSuccess('pc')} />
-              </div>
-            )}
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h3 style={{ fontSize: '16px', margin: '0', fontWeight: '600', color: '#2d3748' }}>
-                👥 Placement Coordinators
-              </h3>
-              <div className="student-count" style={{ fontSize: '12px' }}>
-                <span className="count-badge" style={{ 
-                  background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}>
-                  {pcs.length} coordinators
-                </span>
-              </div>
-            </div>
-            
-            <div className="enhanced-table-container" style={{ 
-              flex: 1,
-              minHeight: '300px',
-              maxHeight: 'calc(100vh - 450px)',
-              overflowY: 'auto',
-              border: '1px solid #dee2e6',
-              borderRadius: '12px',
-              backgroundColor: 'white',
-              position: 'relative'
-            }}>
-              {pcs.length === 0 ? (
-                <div style={{ 
-                  padding: '40px 20px', 
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  background: 'linear-gradient(135deg, #f9fafb, #f3f4f6)',
-                  borderRadius: '12px',
-                  margin: '20px'
-                }}>
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>👥</div>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#374151' }}>No coordinators found</h4>
-                  <p style={{ margin: '0', fontSize: '14px' }}>
-                    Add your first placement coordinator to get started
-                  </p>
-                </div>
-              ) : (
-                <table className="dashboard-table" style={{ marginBottom: 0, fontSize: '13px', width: '100%' }}>
-                  <thead style={{
-                    position: 'sticky',
-                    top: 0,
-                    backgroundColor: '#f8f9fa',
-                    zIndex: 10
-                  }}>
-                    <tr>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>👤 Name</th>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>🆔 Employee ID</th>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>🏢 Department</th>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151', textAlign: 'center' }}>⚡ Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pcs.map((pc, index) => (
-                      <tr key={pc.employeeId} style={{
-                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb'
-                      }}>
-                        <td style={{ padding: '10px 16px', fontWeight: '500' }}>{pc.name}</td>
-                        <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#0891b2' }}>{pc.employeeId}</td>
-                        <td style={{ padding: '10px 16px' }}>{pc.department}</td>
-                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <button 
-                            className="delete-btn" 
-                            onClick={() => deletePC(pc.employeeId)}
-                            title="Delete Placement Coordinator"
-                            style={{ 
-                              padding: '6px 12px', 
-                              fontSize: '11px',
-                              borderRadius: '8px',
-                              fontWeight: '600'
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-        {activeTab === 'tpo' && (
-          <div className="enhanced-tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div className="enhanced-action-section" style={{
-              position: 'sticky',
-              top: '0',
-              backgroundColor: 'rgba(255, 255, 255, 0.98)',
-              backdropFilter: 'blur(15px)',
-              zIndex: 50,
-              paddingTop: '12px',
-              paddingBottom: '12px',
-              borderBottom: '1px solid #e2e8f0',
-              marginBottom: '15px',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-              flexShrink: 0
-            }}>
-              <button 
-                className={`add-btn success form-collapse-btn ${showTPOForm ? 'form-open' : ''}`} 
-                onClick={() => setShowTPOForm((v) => !v)} 
-                style={{ padding: '6px 12px', fontSize: '13px', position: 'relative' }}
-                data-form-status={showTPOForm ? 'open' : 'closed'}
-              >
-                <span className="btn-icon">{showTPOForm ? '−' : '+'}</span>
-                {showTPOForm ? 'Close Form' : 'Add Training & Placement Officer'}
-              </button>
-            </div>
-            {showTPOForm && (
-              <div className="reg-form-box enhanced animate-slide-in" style={{
-                marginBottom: '15px',
-                backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                border: '2px solid #28a745',
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 4px 15px rgba(40, 167, 69, 0.15)',
-                maxHeight: '380px',
-                overflowY: 'auto',
-                flexShrink: 0
-              }}>
-                <h3 style={{ color: '#28a745', marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>
-                  🎯 Add New Training & Placement Officer
+
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="fs-5 m-0 fw-semibold text-dark">
+                  📊 Student List
                 </h3>
-                <TrainingPlacementRegisterForm onSuccess={() => { setShowTPOForm(false); fetchTPOs(); }} />
-              </div>
-            )}
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h3 style={{ fontSize: '16px', margin: '0', fontWeight: '600', color: '#2d3748' }}>
-                🎯 Training & Placement Officers
-              </h3>
-              <div className="student-count" style={{ fontSize: '12px' }}>
-                <span className="count-badge" style={{ 
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}>
-                  {tpos.length} officers
-                </span>
-              </div>
-            </div>
-            
-            <div className="enhanced-table-container" style={{ 
-              flex: 1,
-              minHeight: '300px',
-              maxHeight: 'calc(100vh - 450px)',
-              overflowY: 'auto',
-              border: '1px solid #dee2e6',
-              borderRadius: '12px',
-              backgroundColor: 'white',
-              position: 'relative'
-            }}>
-              {tpos.length === 0 ? (
-                <div style={{ 
-                  padding: '40px 20px', 
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  background: 'linear-gradient(135deg, #f9fafb, #f3f4f6)',
-                  borderRadius: '12px',
-                  margin: '20px'
-                }}>
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>🎯</div>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#374151' }}>No TPO officers found</h4>
-                  <p style={{ margin: '0', fontSize: '14px' }}>
-                    Add your first Training & Placement Officer to get started
-                  </p>
+                <div className="student-count small">
+                  <span className="count-badge badge bg-light text-dark">
+                    {filteredStudents.length} of {students.length} students
+                  </span>
                 </div>
-              ) : (
-                <table className="dashboard-table" style={{ marginBottom: 0, fontSize: '13px', width: '100%' }}>
-                  <thead style={{
-                    position: 'sticky',
-                    top: 0,
-                    backgroundColor: '#f8f9fa',
-                    zIndex: 10
-                  }}>
-                    <tr>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>👤 Name</th>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151' }}>🆔 Employee ID</th>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', color: '#374151', textAlign: 'center' }}>⚡ Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tpos.map((tpo, index) => (
-                      <tr key={tpo.employeeId || tpo.tpdId} style={{
-                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb'
-                      }}>
-                        <td style={{ padding: '10px 16px', fontWeight: '500' }}>{tpo.name}</td>
-                        <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#059669' }}>{tpo.employeeId || tpo.tpdId}</td>
-                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <button 
-                            className="delete-btn" 
-                            onClick={() => deleteTPO(tpo.employeeId || tpo.tpdId)}
-                            title="Delete Training & Placement Officer"
-                            style={{ 
-                              padding: '6px 12px', 
-                              fontSize: '11px',
-                              borderRadius: '8px',
-                              fontWeight: '600'
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              </div>
+
+              <div className="enhanced-table-container table-section">
+                <div className="table-responsive">
+                  {filteredStudents.length === 0 && students.length === 0 ? (
+                    <div className="alert alert-info text-center py-4">
+                      <div className="fs-1 mb-3">🔍</div>
+                      <h4 className="mb-2">No students available</h4>
+                      <p className="m-0">Add your first student to get started</p>
+                    </div>
+                  ) : filteredStudents.length === 0 ? (
+                    <div className="alert alert-info text-center py-4">
+                      <div className="fs-1 mb-3">🔍</div>
+                      <h4 className="mb-2">No matching students found</h4>
+                      <p className="m-0">
+                        {uidSearch ? `No results for "${uidSearch}"` : 'Try adjusting your filters'}
+                      </p>
+                    </div>
+                  ) : (
+                    <table className="table table-striped table-hover">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>UID</th>
+                          <th>Department</th>
+                          <th>Section</th>
+                          <th className="text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStudents.map((student) => (
+                          <tr key={student.UID}>
+                            <td className="fw-medium">{student.name}</td>
+                            <td className="font-monospace text-primary">{student.UID}</td>
+                            <td>{student.department}</td>
+                            <td>{student.section}</td>
+                            <td className="text-center">
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => deleteStudent(student.UID)}
+                                title="Delete Student"
+                                disabled={isLoading}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {!isLoading && activeTab === 'pc' && (
+            <div className="enhanced-tab-content">
+              <div className="enhanced-action-section">
+                <button
+                  className={`add-btn secondary form-collapse-btn ${showPCForm ? 'form-open' : ''}`}
+                  onClick={() => setShowPCForm(v => !v)}
+                  data-form-status={showPCForm ? 'open' : 'closed'}
+                  disabled={isLoading}
+                >
+                  <span className="btn-icon">{showPCForm ? '−' : '+'}</span>
+                  {showPCForm ? 'Close Form' : 'Add Placement Coordinator'}
+                </button>
+              </div>
+              
+              {showPCForm && (
+                <div className="reg-form-box enhanced animate-slide-in mb-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h3 className="text-secondary m-0 fs-6 fw-semibold">
+                      👥 Add New Placement Coordinator
+                    </h3>
+                    <button
+                      onClick={() => setShowPCForm(false)}
+                      className="btn-close"
+                      title="Close Form"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <PlacementCoordinatorForm onSuccess={() => handleFormSuccess('pc')} />
+                </div>
+              )}
+
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="fs-5 m-0 fw-semibold text-dark">
+                  👥 Placement Coordinators
+                </h3>
+                <div className="student-count small">
+                  <span className="count-badge badge bg-light text-dark">
+                    {pcs.length} coordinators
+                  </span>
+                </div>
+              </div>
+
+              <div className="enhanced-table-container">
+                {pcs.length === 0 ? (
+                  <div className="alert alert-info text-center py-4">
+                    <div className="fs-1 mb-3">👥</div>
+                    <h4 className="mb-2">No coordinators found</h4>
+                    <p className="m-0">Add your first placement coordinator to get started</p>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-striped table-hover">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>Employee ID</th>
+                          <th>Department</th>
+                          <th className="text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pcs.map((pc) => (
+                          <tr key={pc.employeeId}>
+                            <td className="fw-medium">{pc.name}</td>
+                            <td className="font-monospace text-info">{pc.employeeId}</td>
+                            <td>{pc.department}</td>
+                            <td className="text-center">
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => deletePC(pc.employeeId)}
+                                title="Delete Placement Coordinator"
+                                disabled={isLoading}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isLoading && activeTab === 'tpo' && (
+            <div className="enhanced-tab-content">
+              <div className="enhanced-action-section">
+                <button
+                  className={`add-btn success form-collapse-btn ${showTPOForm ? 'form-open' : ''}`}
+                  onClick={() => setShowTPOForm(v => !v)}
+                  data-form-status={showTPOForm ? 'open' : 'closed'}
+                  disabled={isLoading}
+                >
+                  <span className="btn-icon">{showTPOForm ? '−' : '+'}</span>
+                  {showTPOForm ? 'Close Form' : 'Add Training & Placement Officer'}
+                </button>
+              </div>
+              
+              {showTPOForm && (
+                <div className="reg-form-box enhanced animate-slide-in mb-4">
+                  <h3 className="text-success mb-3 fs-6 fw-semibold">
+                    🎯 Add New Training & Placement Officer
+                  </h3>
+                  <TrainingPlacementRegisterForm onSuccess={() => handleFormSuccess('tpo')} />
+                </div>
+              )}
+
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="fs-5 m-0 fw-semibold text-dark">
+                  🎯 Training & Placement Officers
+                </h3>
+                <div className="student-count small">
+                  <span className="count-badge badge bg-light text-dark">
+                    {tpos.length} officers
+                  </span>
+                </div>
+              </div>
+
+              <div className="enhanced-table-container">
+                {tpos.length === 0 ? (
+                  <div className="alert alert-info text-center py-4">
+                    <div className="fs-1 mb-3">🎯</div>
+                    <h4 className="mb-2">No TPO officers found</h4>
+                    <p className="m-0">Add your first Training & Placement Officer to get started</p>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-striped table-hover">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>Employee ID</th>
+                          <th className="text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tpos.map((tpo) => (
+                          <tr key={tpo.employeeId || tpo.tpdId}>
+                            <td className="fw-medium">{tpo.name}</td>
+                            <td className="font-monospace text-success">
+                              {tpo.employeeId || tpo.tpdId}
+                            </td>
+                            <td className="text-center">
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => deleteTPO(tpo.employeeId || tpo.tpdId)}
+                                title="Delete Training & Placement Officer"
+                                disabled={isLoading}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+        <Footer />
       </div>
     </div>
   );
 };
 
-export default AdminPage;
+export default AdminDashboard;

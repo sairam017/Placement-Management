@@ -20,19 +20,10 @@ body {
 /* Landing Page Container */
 .landing-page {
   min-height: 100vh;
-  background: 
-    /* Primary overlay for readability */
-    linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.9) 50%, rgba(226, 232, 240, 0.95) 100%),
-    /* Professional recruitment pattern */
-    radial-gradient(ellipse 800px 600px at 20% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse 600px 800px at 80% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-    /* Corporate network lines */
-    linear-gradient(45deg, transparent 30%, rgba(59, 130, 246, 0.02) 35%, transparent 40%),
-    linear-gradient(-45deg, transparent 60%, rgba(99, 102, 241, 0.03) 65%, transparent 70%),
-    /* Base gradient */
-    linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
-  background-size: cover, 100% 100%, 100% 100%, 100% 100%, 100% 100%, cover;
-  background-position: center, center, center, center, center, center;
+  background:
+    linear-gradient(135deg, rgba(248,250,252,0.92) 0%, rgba(44,62,80,0.55) 100%),
+    url('https://www.mymathews.com/media/institute_banner/Auroras_Technological_and_research_institute_BANNER_iucDxxh.JPG') no-repeat center center fixed;
+  background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
   position: relative;

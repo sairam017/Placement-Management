@@ -3,6 +3,7 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import './TrainingPlacement.css';
+import Footer from './footer/Footer';
 
 const TrainingPlacement = () => {
   const [studentPlacements, setStudentPlacements] = useState([]);
@@ -84,29 +85,6 @@ const TrainingPlacement = () => {
     fetchCoordinatorAndData();
     fetchDepartmentApplications();
   }, [fetchDepartmentApplications]);
-
-  useEffect(() => {
-    if (filterCompany) {
-      setFilter('all');
-      // Clear manual department/section filters when company is selected
-      // since company department filtering takes precedence
-      setFilterDepartment('');
-      setFilterSection('');
-    }
-  }, [filterCompany]);
-
-  useEffect(() => {
-    if (filterDepartment) {
-      setFilterSection(''); // Clear section when department changes
-      setFilter('all');
-    }
-  }, [filterDepartment]);
-
-  useEffect(() => {
-    if (filterSection) {
-      setFilter('all');
-    }
-  }, [filterSection]);
 
   const handleAddPlacement = async () => {
     const finalCompanyName = companyName === "Others" ? customCompanyName : companyName;
@@ -227,6 +205,7 @@ const TrainingPlacement = () => {
     if (filterDepartment) {
       filteredByDepartment = studentPlacements.filter(s => s.department === filterDepartment);
     }
+    
     let filteredBySection = filteredByDepartment;
     if (filterSection) {
       filteredBySection = filteredByDepartment.filter(s => s.section === filterSection);
@@ -319,69 +298,87 @@ const TrainingPlacement = () => {
 
       <div className="filters-section">
         <div className="filters-row">
-          <select
-            className="filter-dropdown"
-            value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
-            disabled={filterCompany}
-          >
-            <option value="">-- All Departments --</option>
-            {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-          <select
-            className="filter-dropdown"
-            value={filterSection}
-            onChange={(e) => setFilterSection(e.target.value)}
-            disabled={!filterDepartment || filterCompany}
-          >
-            <option value="">-- All Sections --</option>
-            {filterDepartment ? 
-              [...new Set(studentPlacements
-                .filter(s => s.department === filterDepartment)
-                .map(s => s.section))].sort().map((section) => (
-                <option key={section} value={section}>{section}</option>
-              )) :
-              [...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
-                <option key={section} value={section}>{section}</option>
-              ))
-            }
-          </select>
-          <select
-            className="filter-dropdown"
-            value={filterCompany}
-            onChange={(e) => setFilterCompany(e.target.value)}
-          >
-            <option value="">-- Filter by Company --</option>
-            {[...new Set(companies.map(c => c.companyName))].sort().map((companyName) => {
-              const company = companies.find(c => c.companyName === companyName);
-              const deptLabel = company?.department === 'ALL' ? 'All Depts' : company?.department || 'Unknown';
-              return (
-                <option key={companyName} value={companyName}>
-                  {companyName} ({deptLabel})
-                </option>
-              );
-            })}
-          </select>
-        </div>
-        <div className="filters-row-right">
-          <div className="filter-buttons">
-            <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter("all")}>All Students</button>
-            <button className={`filter-btn ${filter === 'applied' ? 'active' : ''}`} onClick={() => setFilter("applied")}>Applied</button>
-            <button className={`filter-btn ${filter === 'not_applied' ? 'active' : ''}`} onClick={() => setFilter("not_applied")}>Not Applied</button>
+          <div className="filter-group">
+            <label className="filter-label">Department:</label>
+            <select
+              className="filter-dropdown"
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+            >
+              <option value="">All Departments</option>
+              {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
           </div>
+          
+          <div className="filter-group">
+            <label className="filter-label">Section:</label>
+            <select
+              className="filter-dropdown"
+              value={filterSection}
+              onChange={(e) => setFilterSection(e.target.value)}
+              disabled={!filterDepartment}
+            >
+              <option value="">All Sections</option>
+              {filterDepartment ? 
+                [...new Set(studentPlacements
+                  .filter(s => s.department === filterDepartment)
+                  .map(s => s.section))].sort().map((section) => (
+                  <option key={section} value={section}>{section}</option>
+                )) :
+                [...new Set(studentPlacements.map(s => s.section))].sort().map((section) => (
+                  <option key={section} value={section}>{section}</option>
+                ))
+              }
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label className="filter-label">Company:</label>
+            <select
+              className="filter-dropdown"
+              value={filterCompany}
+              onChange={(e) => setFilterCompany(e.target.value)}
+            >
+              <option value="">All Companies</option>
+              {[...new Set(companies.map(c => c.companyName))].sort().map((companyName) => {
+                const company = companies.find(c => c.companyName === companyName);
+                const deptLabel = company?.department === 'ALL' ? 'All Depts' : company?.department || 'Unknown';
+                return (
+                  <option key={companyName} value={companyName}>
+                    {companyName} ({deptLabel})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label className="filter-label">Status:</label>
+            <select
+              className="filter-dropdown"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="all">All Students</option>
+              <option value="applied">Applied</option>
+              <option value="not_applied">Not Applied</option>
+            </select>
+          </div>
+          
           <button className="download-btn" onClick={handleDownloadExcel}>
-            Download Excel
+            <i className="fas fa-download"></i> Export
           </button>
         </div>
-        {filterCompany && (
+        
+        {(filterCompany || filterDepartment || filterSection) && (
           <div className="filter-info">
             <span className="filter-info-text">
-              Showing students for: <strong>{filterCompany}</strong> 
-              {getCompanyDepartment(filterCompany) !== 'ALL' && (
-                <span> (Department: <strong>{getCompanyDepartment(filterCompany)}</strong>)</span>
-              )}
+              {filterCompany && <span>Company: <strong>{filterCompany}</strong> </span>}
+              {getCompanyDepartment(filterCompany) !== 'ALL' && <span>(Dept: <strong>{getCompanyDepartment(filterCompany)}</strong>) </span>}
+              {filterDepartment && <span>| Department: <strong>{filterDepartment}</strong> </span>}
+              {filterSection && <span>| Section: <strong>{filterSection}</strong></span>}
             </span>
           </div>
         )}
@@ -537,7 +534,7 @@ const TrainingPlacement = () => {
                 <option value="CRED">CRED</option>
                 <option value="Swiggy">Swiggy</option>
                 <option value="Zomato">Zomato</option>
-                <option value="BYJU’S">BYJU'S</option>
+                <option value="BYJU'S">BYJU'S</option>
                 <option value="Unacademy">Unacademy</option>
                 <option value="Razorpay">Razorpay</option>
                 <option value="PhonePe">PhonePe</option>
@@ -696,7 +693,7 @@ const TrainingPlacement = () => {
           </div>
         </div>
       )}
-
+      <Footer />
     </div>
   );
 };
