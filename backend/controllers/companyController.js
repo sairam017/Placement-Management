@@ -99,32 +99,60 @@ exports.getCompaniesByStudentUID = async (req, res) => {
       console.log("Could not find student in placement collection, continuing with basic search");
     }
 
-    // Find companies where:
-    // 1. Student UID is in the studentUIDs array (specifically assigned)
-    // 2. OR department matches student's department (if we have it)
-    // 3. OR department is "ALL" (TPO companies available to all)
-    // 4. OR studentUIDs array is empty (department-wide companies)
+    // STRICT UID-BASED FILTERING: Show companies ONLY if:
+    // 1. Student UID is SPECIFICALLY listed in studentUIDs array
+    // 2. OR department is "ALL" (TPO companies for all students)
+    // 3. OR company department matches student department AND studentUIDs is empty (for backward compatibility)
     let searchCriteria = [
-      { studentUIDs: studentUIDNumber },
-      { department: "ALL" },
-      { studentUIDs: { $size: 0 } }
+      { studentUIDs: studentUIDNumber },  // Exact UID match only
+      { department: "ALL" }               // TPO companies for all students
     ];
 
-    // Add department-specific search if we found the student's department
+    // Add department-based matching only if student department is found and for companies with empty studentUIDs
     if (studentDepartment) {
-      searchCriteria.push({ department: studentDepartment });
+      searchCriteria.push({
+        department: studentDepartment,
+        studentUIDs: { $size: 0 }  // Only if no specific students assigned
+      });
     }
+
+    console.log("Search criteria:", JSON.stringify(searchCriteria, null, 2));
 
     const companies = await Company.find({
       $or: searchCriteria
     }).sort({ createdAt: -1 });
     
-    console.log(`Found ${companies.length} companies accessible to student ${studentUIDNumber} from department ${studentDepartment || 'unknown'}`);
+    console.log(`\n=== FILTERING RESULTS FOR STUDENT UID ${studentUIDNumber} ===`);
+    console.log(`Student Department: ${studentDepartment || 'NOT FOUND'}`);
+    console.log(`Total Companies Found: ${companies.length}`);
+    
+    companies.forEach((company, index) => {
+      let reason = '';
+      if (company.studentUIDs.includes(studentUIDNumber)) {
+        reason = `🎯 SPECIFICALLY ASSIGNED - UID ${studentUIDNumber} is in studentUIDs array`;
+      } else if (company.department === 'ALL') {
+        reason = `🌐 TPO COMPANY - Available to all students`;
+      } else if (company.department === studentDepartment && company.studentUIDs.length === 0) {
+        reason = `🏫 DEPARTMENT COMPANY - ${studentDepartment} department, no specific students assigned`;
+      } else {
+        reason = `❓ UNEXPECTED - This should not appear!`;
+      }
+      
+      console.log(`${index + 1}. ${company.companyName}`);
+      console.log(`   Department: ${company.department}`);
+      console.log(`   Student UIDs: [${company.studentUIDs.join(', ') || 'NONE'}]`);
+      console.log(`   Access Reason: ${reason}`);
+      console.log('');
+    });
+    
+    console.log(`=== END FILTERING RESULTS ===\n`);
     
     res.json({ 
       success: true,
       data: companies,
-      count: companies.length 
+      count: companies.length,
+      studentUID: studentUIDNumber,
+      studentDepartment: studentDepartment
     });
   } catch (error) {
     console.error("Error fetching companies for student UID:", error);

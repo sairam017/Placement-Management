@@ -1,0 +1,157 @@
+/* Footer.css - Modern, beautiful, and responsive footer styles with smooth label animation */
+.footer {
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 -2px 16px 0 rgba(0,0,0,0.08);
+  padding: 24px 0 12px 0;
+  width: 100%;
+  position: relative;
+  z-index: 10;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.footer-links {
+  display: flex;
+  gap: 36px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.footer-label {
+  position: relative;
+  font-size: 1.08rem;
+  color: #1976d2;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 18px;
+  border-radius: 8px;
+  background: #f5faff;
+  box-shadow: 0 2px 8px 0 rgba(25, 118, 210, 0.06);
+  transition: background 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
+  will-change: transform, background, color;
+  margin-bottom: 2px;
+  animation: labelFadeIn 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+.footer-label:hover,
+.footer-label:focus {
+  background: #1976d2;
+  color: #fff;
+  transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 6px 24px 0 rgba(25, 118, 210, 0.18);
+}
+@keyframes labelFadeIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.footer-link-tooltip {
+  display: none;
+}
+
+/* Modal styles for footer popups */
+.footer-modal-overlay {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  top: unset;
+  height: auto;
+  min-height: 0;
+  background: rgba(30, 42, 60, 0.45);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeInOverlay 0.3s;
+  pointer-events: auto;
+}
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.footer-modal {
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 8px 40px 0 rgba(25, 118, 210, 0.18);
+  padding: 36px 32px 28px 32px;
+  max-width: 100vw;
+  width: 100vw;
+  position: relative;
+  margin-bottom: 0;
+  animation: modalPopUp 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes modalPopUp {
+  from { opacity: 0; transform: translateY(60px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.footer-modal-content h2 {
+  margin-top: 0;
+  color: #1976d2;
+  font-size: 1.4rem;
+  margin-bottom: 1px;
+}
+.footer-modal-content p {
+  color: #333;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+.footer-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #1976d2;
+  cursor: pointer;
+  transition: color 0.2s;
+  z-index: 2;
+}
+.footer-modal-close:hover {
+  color: #c62828;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .footer-links {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .footer-modal {
+    padding: 18px 4vw 18px 4vw;
+    width: 100vw;
+    max-width: 100vw;
+  }
+}
+
+.copyright {
+  font-size: 0.97rem;
+  color: #888;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Button styles for footer (if needed) */
+.footer-btn {
+  margin-left: 18px;
+  padding: 6px 18px;
+  border-radius: 8px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px 0 rgba(25, 118, 210, 0.10);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.footer-btn:hover,
+.footer-btn:focus {
+  background: #1251a3;
+  box-shadow: 0 4px 16px 0 rgba(25, 118, 210, 0.18);
+  transform: translateY(-2px) scale(1.04);
+}

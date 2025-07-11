@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './LandingPage.css'; // Import the new CSS file
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import LoginForm from './Login';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [showLoginForm, setShowLoginForm] = useState(false);
   const [userType, setUserType] = useState('admin');
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
@@ -120,59 +122,94 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="container-fluid p-0">
-      {/* Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-light">
-        <div className="container">
-          <h2 className="navbar-brand">Aurora Placement Management System</h2>
+    <div className="landing-page">
+      {/* Top Header with Login Button */}
+      <header className="top-header">
+        <div className="header-content">
+          <div className="header-left">
+            <h2 className="portal-title">Aurora Placement Portal</h2>
+          </div>
+          <div className="header-right">
+            {!showLoginForm && (
+              <button 
+                className="login-trigger-btn-top"
+                onClick={() => setShowLoginForm(true)}
+              >
+                Login
+              </button>
+            )}
+          </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Jumbotron */}
-      <div className="jumbotron text-center bg-info text-white">
-        <h1 className="display-4">Welcome to Aurora Placement Portal</h1>
-        <p className="lead">Empowering students, connecting opportunities.</p>
-      </div>
+      {/* Main Content Area */}
+      <main className="main-content">
+        {/* Water Animation Container */}
+        <div className="water-animation-container">
+          <div className="water-wave wave1"></div>
+          <div className="water-wave wave2"></div>
+          <div className="water-wave wave3"></div>
+          <div className="water-drop drop1"></div>
+          <div className="water-drop drop2"></div>
+          <div className="water-drop drop3"></div>
+        </div>
 
-      {/* Login Form */}
-      <div className="container mt-4">
-        <div className="row justify-content-center">
-          <div className="col-md-6">
-            <div className="card">
-              <div className="card-header text-center">Login</div>
-              <div className="card-body">
-                <LoginForm
-                  userType={userType}
-                  setUserType={setUserType}
-                  userId={userId}
-                  setUserId={setUserId}
-                  password={password}
-                  setPassword={setPassword}
-                  loginError={loginError}
-                  studentLoginUID={studentLoginUID}
-                  setStudentLoginUID={setStudentLoginUID}
-                  studentLoginPassword={studentLoginPassword}
-                  setStudentLoginPassword={setStudentLoginPassword}
-                  studentLoginError={studentLoginError}
-                  studentLoginDepartment={studentLoginDepartment}
-                  setStudentLoginDepartment={setStudentLoginDepartment}
-                  showStudentPassword={showStudentPassword}
-                  setShowStudentPassword={setShowStudentPassword}
-                  showPassword={showPassword}
-                  setShowPassword={setShowPassword}
-                  userDepartment={userDepartment}
-                  setUserDepartment={setUserDepartment}
-                  handleLogin={handleLogin}
-                />
+        {/* Welcome Text */}
+        <div className="welcome-content">
+          <h1 className="main-title">Welcome to Aurora Placements</h1>
+          <p className="main-subtitle">Empowering students, connecting opportunities</p>
+        </div>
+
+        {/* Login Form Modal */}
+        {showLoginForm && (
+          <div className="login-modal-overlay">
+            <div className="login-form-container">
+              <div className="login-card">
+                <div className="login-card-header">
+                  <h3>Login to Your Account</h3>
+                  <button 
+                    className="close-btn"
+                    onClick={() => setShowLoginForm(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="login-card-body">
+                  <LoginForm
+                    userType={userType}
+                    setUserType={setUserType}
+                    userId={userId}
+                    setUserId={setUserId}
+                    password={password}
+                    setPassword={setPassword}
+                    loginError={loginError}
+                    studentLoginUID={studentLoginUID}
+                    setStudentLoginUID={setStudentLoginUID}
+                    studentLoginPassword={studentLoginPassword}
+                    setStudentLoginPassword={setStudentLoginPassword}
+                    studentLoginError={studentLoginError}
+                    studentLoginDepartment={studentLoginDepartment}
+                    setStudentLoginDepartment={setStudentLoginDepartment}
+                    showStudentPassword={showStudentPassword}
+                    setShowStudentPassword={setShowStudentPassword}
+                    showPassword={showPassword}
+                    setShowPassword={setShowPassword}
+                    userDepartment={userDepartment}
+                    setUserDepartment={setUserDepartment}
+                    handleLogin={handleLogin}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
+      </main>
 
       {/* Footer */}
-      <footer className="bg-light text-center p-3 mt-5">
-        &copy; {new Date().getFullYear()} Aurora Deemed to be University. All rights reserved.
+      <footer className="footer">
+        <div className="footer-content">
+          &copy; {new Date().getFullYear()} Aurora Deemed to be University. All rights reserved.
+        </div>
       </footer>
     </div>
   );
