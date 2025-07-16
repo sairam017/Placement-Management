@@ -3,6 +3,8 @@
 const AdminLogin = require('../models/AdminLogin');
 const jwt = require('jsonwebtoken');
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Admin Login
 exports.adminLogin = async (req, res) => {
   try {
@@ -40,8 +42,9 @@ exports.adminLogin = async (req, res) => {
     admin.lastLogin = new Date();
     await admin.save();
 
+
     // Generate JWT token
-    const jwtSecret = 'mysecretkey'; // Use consistent secret
+    const jwtSecret = require("../config/jwtSecret");
     const token = jwt.sign(
       { 
         id: admin._id, 
@@ -52,7 +55,6 @@ exports.adminLogin = async (req, res) => {
       jwtSecret,
       { expiresIn: '24h' }
     );
-
     res.json({
       success: true,
       message: 'Admin login successful',
@@ -66,7 +68,7 @@ exports.adminLogin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Admin login error:', error);
+    if (isDev) console.error('Admin login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during login'
@@ -91,7 +93,7 @@ exports.getAdminProfile = async (req, res) => {
       data: admin
     });
   } catch (error) {
-    console.error('Get admin profile error:', error);
+    if (isDev) console.error('Get admin profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -116,14 +118,14 @@ exports.initializeDefaultAdmin = async () => {
       });
 
       await defaultAdmin.save();
-      console.log('✅ Default admin created successfully');
-      console.log('   UID: 1111');
-      console.log('   Password: admin123');
+      if (isDev) console.log('✅ Default admin created successfully');
+      if (isDev) console.log('   UID: 1111');
+      if (isDev) console.log('   Password: admin123');
     } else {
-      console.log('ℹ️  Default admin already exists');
+      if (isDev) console.log('ℹ️  Default admin already exists');
     }
   } catch (error) {
-    console.error('❌ Error initializing default admin:', error);
+    if (isDev) console.error('❌ Error initializing default admin:', error);
   }
 };
 
@@ -146,7 +148,7 @@ exports.getDashboardStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    if (isDev) console.error('Dashboard stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -194,7 +196,7 @@ exports.changePassword = async (req, res) => {
       message: 'Password changed successfully'
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    if (isDev) console.error('Change password error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

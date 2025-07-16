@@ -3,6 +3,7 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import './PlacementDashboard.css'; // Assuming you have a CSS file for styling
+import Footer from './footer/Footer';
 
 const PlacementDashboard = () => {
   const [studentPlacements, setStudentPlacements] = useState([]);
@@ -50,7 +51,6 @@ const PlacementDashboard = () => {
       );
       const data = Array.isArray(res.data) ? res.data : [];
       setStudentPlacements(data);
-      console.log('Fetched studentPlacements:', data.map(s => s.section)); // Debug: see sections present
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to load data.");
@@ -85,7 +85,6 @@ const PlacementDashboard = () => {
       const res = await axios.get(`http://localhost:5000/api/applications/department/${coordinator.department}`);
       if (res.data.success) {
         setApplications(res.data.data);
-        console.log('Fetched applications:', res.data.data); // Debug: see applications
       }
     } catch (err) {
       console.error('Error fetching department applications:', err);
@@ -122,10 +121,6 @@ const PlacementDashboard = () => {
     }
     if (!coordinator?.department) {
       alert("Department information is missing.");
-      return;
-    }
-    if (selectedStudents.length === 0) {
-      alert("Please select at least one student before adding a company.");
       return;
     }
     try {
@@ -193,24 +188,25 @@ const PlacementDashboard = () => {
   };
 
   const hasStudentAppliedToCompany = (studentUID, companyName) => {
-    // Ensure both UIDs are compared as strings for consistency
     return applications.some(app => 
-      String(app.studentUID) === String(studentUID) && app.companyName === companyName
+      app.studentUID === studentUID.toString() && app.companyName === companyName
     );
   };
 
   const hasStudentAnyApplication = (studentUID) => {
-    // Ensure both UIDs are compared as strings for consistency
-    return applications.some(app => String(app.studentUID) === String(studentUID));
+    return applications.some(app => app.studentUID === studentUID.toString());
   };
 
   const getFilteredStudents = () => {
     let filteredBySection = studentPlacements;
-    
-    // Filter by section first
-    if (filterSection) {
+    // Only filter by section if a specific section is selected (not empty string)
+    if (filterSection && filterSection.trim() !== "") {
       filteredBySection = studentPlacements.filter(s => s.section === filterSection);
       console.log(`Filtered by section '${filterSection}':`, filteredBySection.length, 'students');
+    } else {
+      // No section selected, show all students (no filtering)
+      filteredBySection = studentPlacements;
+      console.log('No section filter applied, showing all students:', filteredBySection.length);
     }
     
     // Then filter by company - show only students who are eligible for the selected company
@@ -305,53 +301,31 @@ const PlacementDashboard = () => {
     }
   };
 
-  const handleDeleteCompany = async (companyId, companyDepartment) => {
-    // Check if coordinator can delete this company (only their own department companies)
-    if (companyDepartment !== coordinator?.department) {
-      alert("You can only delete companies from your department. TPO companies (ALL departments) cannot be deleted by coordinators.");
-      return;
-    }
-
-    if (!window.confirm("Are you sure you want to delete this company? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      await axios.delete(`http://localhost:5000/api/companies/${companyId}`, {
-        data: {
-          userDepartment: coordinator?.department,
-          userRole: 'coordinator'
-        }
-      });
-      alert("Company deleted successfully!");
-      
-      // Refresh companies list
-      const companiesRes = await axios.get("http://localhost:5000/api/companies/all");
-      if (Array.isArray(companiesRes.data.data)) {
-        setCompanies(companiesRes.data.data);
-      }
-
-    } catch (err) {
-      console.error("Error deleting company:", err);
-      alert(`Failed to delete company: ${err.response?.data?.message || err.message}`);
-    }
-  };
 
   return (
     <div className="placement-dashboard">
       {/* Header Section */}
-      <div className="header-section">
+      <div className="header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="welcome-text">
           <h2>Welcome, {coordinator?.name}</h2>
           <p>Department: {coordinator?.department}</p>
         </div>
-        <button className="logout-btn" onClick={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("coordinator");
-          window.location.href = "/";
-        }}>
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            className="change-password-btn"
+            style={{ background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', padding: '8px 14px', cursor: 'pointer' }}
+            onClick={() => setShowPasswordModal(true)}
+          >
+            Change Password
+          </button>
+          <button className="logout-btn" onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("coordinator");
+            window.location.href = "/";
+          }}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Filter Controls Row */}
@@ -416,67 +390,74 @@ const PlacementDashboard = () => {
           <div className="error-state">{error}</div>
         ) : (
           <div className="table-container">
-            <table className="students-table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                      onChange={handleSelectAllStudents}
-                    />
-                  </th>
-                  <th>S.No</th>
-                  <th>Name</th>
-                  <th>UID</th>
-                  <th>Section</th>
-                  <th>Email</th>
-                  <th>Mobile</th>
-                  <th>Relocate</th>
-                  <th>Resume</th>
-                  <th>Applied</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((student, index) => (
-                  <tr key={student.UID}>
-                    <td>
+            <div style={{ maxHeight: '440px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
+              {/* Adjust maxHeight to fit 6 rows (approx 65px per row including header, adjust as needed) */}
+              {/* 6 rows * 50px (row height) + 50px (header) = 350px, so set to 400px for spacing */}
+              {/* If you want more compact, reduce px value */}
+              <table className="students-table">
+                <thead>
+                  <tr>
+                    <th>
                       <input
                         type="checkbox"
-                        checked={selectedStudents.includes(student.UID)}
-                        onChange={() => handleStudentSelect(student.UID)}
+                        checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                        onChange={handleSelectAllStudents}
                       />
-                    </td>
-                    <td>{index + 1}</td>
-                    <td>{student.name}</td>
-                    <td>{student.UID}</td>
-                    <td>{student.section}</td>
-                    <td>{student.mailid}</td>
-                    <td>{student.mobile}</td>
-                    <td>{student.relocate ? "Yes" : "No"}</td>
-                    <td>
-                      {student.resumeUrl ? (
-                        <a 
-                          href={`http://localhost:5000${student.resumeUrl}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="resume-link"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      {filterCompany
-                        ? hasStudentAppliedToCompany(student.UID, filterCompany) ? "Yes" : "No"
-                        : hasStudentAnyApplication(student.UID) ? "Yes" : "No"}
-                    </td>
+                    </th>
+                    <th>S.No</th>
+                    <th>Name</th>
+                    <th>UID</th>
+                    <th>Section</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
+                    <th>Relocate</th>
+                    <th>Resume</th>
+                    <th>Applied</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student, index) => (
+                    <tr key={student.UID}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.includes(student.UID)}
+                          onChange={() => handleStudentSelect(student.UID)}
+                        />
+                      </td>
+                      <td>{index + 1}</td>
+                      <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }} title={student.name}>{student.name}</td>
+                      <td>{student.UID}</td>
+                      <td>{student.section}</td>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={student.mailid}>{student.mailid}</td>
+                      <td>{student.mobile}</td>
+                      <td>{student.relocate ? "Yes" : "No"}</td>
+                      <td>
+                        {student.resumeUrl ? (
+                          <a 
+                            href={`http://localhost:5000${student.resumeUrl}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="resume-link"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        {filterCompany
+                          ? hasStudentAppliedToCompany(student.UID, filterCompany) ? "Yes" : "No"
+                          : (filter === "applied" || filter === "not_applied")
+                            ? (hasStudentAnyApplication(student.UID) ? "Yes" : "No")
+                            : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -630,7 +611,9 @@ const PlacementDashboard = () => {
             </div>
           </div>
         </div>
+
       )}
+      <Footer />
     </div>
   );
 };

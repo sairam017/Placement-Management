@@ -1,7 +1,11 @@
+
 const express = require("express");
 const router = express.Router();
 const studentController = require("../controllers/studentController");
 const authMiddleware = require("../middleware/authMiddleware");
+
+// Change password (Student)
+router.post("/change-password", authMiddleware.verifyToken, studentController.changeStudentPassword);
 
 // Create student (Admin only)
 router.post("/create", authMiddleware.verifyToken, studentController.createStudent);
@@ -18,6 +22,9 @@ router.get("/all", authMiddleware.verifyToken, studentController.getAllStudents)
 // Get by UID (Admin only)
 router.get("/uid/:uid", authMiddleware.verifyToken, studentController.getStudentByUID);
 
+
+// Get unique departments (for login dropdown)
+router.get("/departments", studentController.getDepartments);
 // Get students by department (for dashboard)
 router.get("/department/:department", studentController.getStudentsByDepartment);
 

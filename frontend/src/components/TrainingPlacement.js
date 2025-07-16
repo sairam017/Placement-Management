@@ -96,10 +96,6 @@ const TrainingPlacement = () => {
       alert("Please enter a custom company name.");
       return;
     }
-    if (selectedStudents.length === 0) {
-      alert("Please select at least one student before adding a company.");
-      return;
-    }
     try {
       const payload = {
         companyName: finalCompanyName,
@@ -259,7 +255,7 @@ const TrainingPlacement = () => {
       return;
     }
     try {
-      const response = await axios.put('http://localhost:5000/api/tpos/change-password', {
+      await axios.put('http://localhost:5000/api/tpos/change-password', {
         employeeId: coordinator.employeeId,
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
@@ -546,7 +542,6 @@ const TrainingPlacement = () => {
                 <option value="Meesho">Meesho</option>
                 <option value="Delhivery">Delhivery</option>
                 <option value="Nykaa">Nykaa</option>
-                <option value="OYO Rooms">OYO Rooms</option>
                 <option value="Boat">Boat</option>
                 <option value="Udaan">Udaan</option>
                 <option value="Others">Others</option>
@@ -603,6 +598,7 @@ const TrainingPlacement = () => {
               className="form-control"
               value={selectedDepartmentForCompany}
               onChange={(e) => setSelectedDepartmentForCompany(e.target.value)}
+              disabled={selectedStudents.length > 0} // Disable if students are selected
             >
               <option value="ALL">ALL Departments</option>
               {[...new Set(studentPlacements.map(s => s.department))].sort().map((dept) => (

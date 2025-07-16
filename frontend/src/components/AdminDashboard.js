@@ -18,18 +18,38 @@ const StudentRegisterForm = ({ onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uidError, setUidError] = useState('');
   const [isCheckingUID, setIsCheckingUID] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
+
+  // Fetch unique departments from students collection
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setIsLoadingDepartments(true);
+      try {
+        const res = await axios.get('http://localhost:5000/api/students/all', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        });
+        const students = res.data.data || [];
+        let uniqueDepartments = [...new Set(students.map(s => s.department?.trim().toUpperCase()).filter(Boolean))];
+        // Always include BTECH (or BTECHA if that's the correct value)
+        if (!uniqueDepartments.includes('BTECH')) {
+          uniqueDepartments.push('BTECH');
+        }
+        uniqueDepartments = uniqueDepartments.sort();
+        setDepartments(uniqueDepartments);
+      } catch (err) {
+        setDepartments(['BTECH']); // fallback to at least BTECH
+      } finally {
+        setIsLoadingDepartments(false);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   // Debounced UID validation
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (formData.UID.trim() && formData.UID.length > 2) {
-        validateUID(formData.UID.trim());
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData.UID]);
-
-  const validateUID = async (uid) => {
+  const validateUID = useCallback(async (uid) => {
     setIsCheckingUID(true);
     try {
       const uidExists = await checkUIDExists(uid);
@@ -44,7 +64,16 @@ const StudentRegisterForm = ({ onSuccess }) => {
     } finally {
       setIsCheckingUID(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.UID.trim() && formData.UID.length > 2) {
+        validateUID(formData.UID.trim());
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.UID, validateUID]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -52,7 +81,6 @@ const StudentRegisterForm = ({ onSuccess }) => {
       ...prev,
       [name]: value
     }));
-    
     // Clear UID error when user starts typing
     if (name === 'UID') {
       setUidError('');
@@ -78,19 +106,16 @@ const StudentRegisterForm = ({ onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
     try {
       // Basic validation
       if (!formData.UID.trim()) {
         setUidError('UID is required');
         return;
       }
-      
       if (uidError) {
         // Don't submit if there's already a UID error
         return;
       }
-      
       // If password is empty, set a default password based on UID
       const submissionData = {
         ...formData,
@@ -100,14 +125,12 @@ const StudentRegisterForm = ({ onSuccess }) => {
         section: formData.section.trim(),
         password: formData.password.trim() || `student_${formData.UID.trim()}`
       };
-      
       const response = await axios.post('http://localhost:5000/api/students/create', submissionData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
       });
-      
       if (response.data.success) {
         alert(`✅ Student registered successfully!\nUID: ${submissionData.UID}\nName: ${submissionData.name}`);
         setFormData({
@@ -124,14 +147,12 @@ const StudentRegisterForm = ({ onSuccess }) => {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      
       let errorMessage = 'Server error';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       // Handle specific error cases
       if (errorMessage.includes('UID already taken') || errorMessage.includes('already exists')) {
         setUidError(errorMessage);
@@ -183,14 +204,21 @@ const StudentRegisterForm = ({ onSuccess }) => {
       </div>
       <div className="mb-3">
         <label className="form-label">Department</label>
-        <input
-          type="text"
-          className="form-control"
+        <select
+          className="form-select"
           name="department"
           value={formData.department}
           onChange={handleChange}
           required
-        />
+          disabled={isLoadingDepartments}
+        >
+          <option value="">{isLoadingDepartments ? 'Loading departments...' : 'Select Department'}</option>
+          {departments.map((dept) => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+        {/* Optionally allow manual entry if needed: */}
+        {/* <input type="text" className="form-control mt-2" name="department" value={formData.department} onChange={handleChange} placeholder="Or enter department manually" /> */}
       </div>
       <div className="mb-3">
         <label className="form-label">Section</label>
@@ -214,9 +242,9 @@ const StudentRegisterForm = ({ onSuccess }) => {
           placeholder="Leave blank for default password"
         />
       </div>
-      <button 
-        type="submit" 
-        className="btn btn-primary w-100" 
+      <button
+        type="submit"
+        className="btn btn-primary w-100"
         disabled={isSubmitting || !!uidError}
       >
         {isSubmitting ? (
@@ -252,7 +280,7 @@ const PlacementCoordinatorForm = ({ onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/coordinators', formData, {
+      await axios.post('http://localhost:5000/api/coordinators/coordinator', formData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
@@ -444,6 +472,47 @@ const AdminDashboard = () => {
   const [showPCForm, setShowPCForm] = useState(false);
   const [showTPOForm, setShowTPOForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Admin password change modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      alert('Please fill all password fields.');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("New password and confirm password don't match.");
+      return;
+    }
+    if (passwordData.newPassword.length < 4) {
+      alert('New password must be at least 4 characters long.');
+      return;
+    }
+    try {
+      await axios.put('http://localhost:5000/api/admin/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      }, {
+        headers: getAuthHeaders()
+      });
+      alert('Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      console.error('Error changing password:', err);
+      alert(`Failed to change password: ${err.response?.data?.message || err.message}`);
+    }
+  };
 
   const handleFormSuccess = (formType) => {
     switch (formType) {
@@ -713,9 +782,8 @@ const AdminDashboard = () => {
 
   const deletePC = async (employeeId) => {
     if (!window.confirm('Are you sure you want to delete this Placement Coordinator?')) return;
-    
     try {
-      await axios.delete(`http://localhost:5000/api/coordinators/${employeeId}`, {
+      await axios.delete(`http://localhost:5000/api/coordinators/coordinator/${employeeId}`, {
         headers: getAuthHeaders()
       });
       alert('Placement Coordinator deleted successfully');
@@ -745,7 +813,15 @@ const AdminDashboard = () => {
     <div className="admin-bg">
       <div className="admin-dashboard-container animate-fade-in">
         {/* Logout Button in Top-Right Corner */}
-        <div className="logout-container">
+
+        <div className="logout-container" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            className="change-password-btn"
+            style={{ background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', padding: '8px 14px', cursor: 'pointer' }}
+            onClick={() => setShowPasswordModal(true)}
+          >
+            Change Password
+          </button>
           <button onClick={handleLogout} className="logout-btn">
             <i className="bi bi-box-arrow-right"></i> Logout
           </button>
@@ -1145,6 +1221,88 @@ const AdminDashboard = () => {
             </div>
           )}
         </div>
+        {/* Password Change Modal */}
+        {showPasswordModal && (
+          <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Change Password</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setPasswordData({
+                        currentPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                      });
+                    }}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label htmlFor="currentPassword" className="form-label">Current Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      id="currentPassword"
+                      value={passwordData.currentPassword}
+                      onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                      placeholder="Enter current password"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="newPassword" className="form-label">New Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      id="newPassword"
+                      value={passwordData.newPassword}
+                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      placeholder="Enter new password (min 4 characters)"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="confirmPassword" className="form-label">Confirm New Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      id="confirmPassword"
+                      value={passwordData.confirmPassword}
+                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setPasswordData({
+                        currentPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                      });
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleChangePassword}
+                  >
+                    Change Password
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <Footer />
       </div>
     </div>

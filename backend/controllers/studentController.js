@@ -1,3 +1,40 @@
+// Get unique departments
+exports.getDepartments = async (req, res) => {
+  try {
+    const departments = await Student.distinct("department");
+    res.json(departments.filter(Boolean).map(d => d.trim().toUpperCase()).sort());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Change Student Password
+exports.changeStudentPassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const UID = req.user.UID;
+    if (!UID || !oldPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    const student = await Student.findOne({ UID });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found." });
+    }
+    const isMatch = await bcrypt.compare(oldPassword, student.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect." });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: "New password must be at least 4 characters long." });
+    }
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    student.password = hashedNewPassword;
+    await student.save();
+    res.json({ message: "Password changed successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error." });
+  }
+};
 const Student = require("../models/studentModel");
 const PlacementStudent = require("../models/studentPlacementModel");
 const bcrypt = require("bcryptjs");
@@ -83,10 +120,13 @@ exports.loginStudent = async (req, res) => {
       section: student.section
     };
 
+    const jwt = require("jsonwebtoken");
+    const JWT_SECRET = require("../config/jwtSecret");
+    const token = jwt.sign({ UID: student.UID, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
     res.json({
       message: "Login successful",
       data: studentData,
-      token: "dummy-token" // Replace with JWT if needed
+      token
     });
   } catch (err) {
     res.status(500).json({ message: "Server error" });

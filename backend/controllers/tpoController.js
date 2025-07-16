@@ -78,7 +78,7 @@ exports.updateTPO = async (req, res) => {
 // Delete TPO
 exports.deleteTPO = async (req, res) => {
   try {
-    const tpo = await TPO.findByIdAndDelete(req.params.id);
+    const tpo = await TPO.findOneAndDelete({ employeeId: req.params.id });
     if (!tpo) {
       return res.status(404).json({ message: "TPO not found" });
     }

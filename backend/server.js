@@ -19,6 +19,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isDev = process.env.NODE_ENV !== 'production';
 
 app.use(cors());
 app.use(express.json());
@@ -30,13 +31,13 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
-    console.log("✅ MongoDB connected successfully");
+    if (isDev) console.log("✅ MongoDB connected successfully");
     
     // Initialize default admin after DB connection
     await initializeDefaultAdmin();
     
   } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
+    if (isDev) console.error("❌ MongoDB connection failed:", err.message);
     process.exit(1);
   }
 };
@@ -63,5 +64,5 @@ app.get("/", (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🟢 Backend running on http://localhost:${PORT}`);
+  if (isDev) console.log(`🟢 Backend running on http://localhost:${PORT}`);
 });

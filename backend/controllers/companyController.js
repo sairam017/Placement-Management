@@ -1,13 +1,16 @@
 const Company = require("../models/Company");
 const StudentPlacement = require("../models/studentPlacementModel");
 
+// Helper for environment-aware logging
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Debug only – safe, does not delete anything
 const logCurrentIndexes = async () => {
   try {
     const indexes = await Company.collection.getIndexes();
-    console.log("Current indexes on Company collection:", Object.keys(indexes));
+    // No logging
   } catch (error) {
-    console.error("Error checking indexes:", error);
+    // No error logging
   }
 };
 
@@ -41,8 +44,6 @@ exports.addCompany = async (req, res) => {
       permanent: true
     });
   } catch (error) {
-    console.error("Error adding company:", error);
-
     return res.status(500).json({
       message: "Failed to add company: " + error.message,
       permanent: true
@@ -65,7 +66,6 @@ exports.getCompaniesByDepartment = async (req, res) => {
     
     res.json({ data: companies });
   } catch (error) {
-    console.error("Error fetching companies by department:", error);
     res.status(500).json({ message: "Failed to fetch companies." });
   }
 };
@@ -76,7 +76,7 @@ exports.getCompaniesByStudentUID = async (req, res) => {
     const { studentUID } = req.params;
     const studentUIDNumber = parseInt(studentUID);
     
-    console.log("Fetching companies for student UID:", studentUIDNumber);
+    // No logging
     
     if (!studentUIDNumber) {
       return res.status(400).json({ 
@@ -93,10 +93,10 @@ exports.getCompaniesByStudentUID = async (req, res) => {
       const studentData = await StudentPlacement.findOne({ UID: studentUIDNumber });
       if (studentData) {
         studentDepartment = studentData.department;
-        console.log("Student department from placement data:", studentDepartment);
+        // No logging
       }
     } catch (err) {
-      console.log("Could not find student in placement collection, continuing with basic search");
+      // No logging
     }
 
     // STRICT UID-BASED FILTERING: Show companies ONLY if:
@@ -116,36 +116,13 @@ exports.getCompaniesByStudentUID = async (req, res) => {
       });
     }
 
-    console.log("Search criteria:", JSON.stringify(searchCriteria, null, 2));
+    // No logging
 
     const companies = await Company.find({
       $or: searchCriteria
     }).sort({ createdAt: -1 });
     
-    console.log(`\n=== FILTERING RESULTS FOR STUDENT UID ${studentUIDNumber} ===`);
-    console.log(`Student Department: ${studentDepartment || 'NOT FOUND'}`);
-    console.log(`Total Companies Found: ${companies.length}`);
-    
-    companies.forEach((company, index) => {
-      let reason = '';
-      if (company.studentUIDs.includes(studentUIDNumber)) {
-        reason = `🎯 SPECIFICALLY ASSIGNED - UID ${studentUIDNumber} is in studentUIDs array`;
-      } else if (company.department === 'ALL') {
-        reason = `🌐 TPO COMPANY - Available to all students`;
-      } else if (company.department === studentDepartment && company.studentUIDs.length === 0) {
-        reason = `🏫 DEPARTMENT COMPANY - ${studentDepartment} department, no specific students assigned`;
-      } else {
-        reason = `❓ UNEXPECTED - This should not appear!`;
-      }
-      
-      console.log(`${index + 1}. ${company.companyName}`);
-      console.log(`   Department: ${company.department}`);
-      console.log(`   Student UIDs: [${company.studentUIDs.join(', ') || 'NONE'}]`);
-      console.log(`   Access Reason: ${reason}`);
-      console.log('');
-    });
-    
-    console.log(`=== END FILTERING RESULTS ===\n`);
+    // No logging
     
     res.json({ 
       success: true,
@@ -155,7 +132,6 @@ exports.getCompaniesByStudentUID = async (req, res) => {
       studentDepartment: studentDepartment
     });
   } catch (error) {
-    console.error("Error fetching companies for student UID:", error);
     res.status(500).json({ 
       success: false,
       message: "Failed to fetch companies." 
@@ -169,7 +145,6 @@ exports.getAllCompanies = async (req, res) => {
     const companies = await Company.find();
     res.json({ data: companies });
   } catch (error) {
-    console.error("Error fetching all companies:", error);
     res.status(500).json({ message: "Failed to fetch companies." });
   }
 };
@@ -192,7 +167,6 @@ exports.getApplicantsByCompany = async (req, res) => {
 
     res.status(200).json(applicants);
   } catch (error) {
-    console.error("Error fetching applicants by company:", error);
     res.status(500).json({ message: "Failed to fetch applicants." });
   }
 };
@@ -234,7 +208,6 @@ exports.addStudentsToCompany = async (req, res) => {
       permanent: true
     });
   } catch (error) {
-    console.error("Error adding new placement round:", error);
     return res.status(500).json({
       message: "Failed to create new placement round: " + error.message
     });
@@ -244,11 +217,9 @@ exports.addStudentsToCompany = async (req, res) => {
 // ✅ Database info (no mutations)
 exports.getDatabaseStats = async (req, res) => {
   try {
-    console.log("Getting database statistics...");
-
+    // No logging
     const indexes = await Company.collection.getIndexes();
     const companyCount = await Company.countDocuments();
-
     const departmentStats = await Company.aggregate([
       {
         $group: {
@@ -264,7 +235,6 @@ exports.getDatabaseStats = async (req, res) => {
         }
       }
     ]);
-
     res.json({
       message: "Database statistics retrieved successfully!",
       totalCompanies: companyCount,
@@ -273,7 +243,6 @@ exports.getDatabaseStats = async (req, res) => {
       dataIntegrity: "All data permanently preserved"
     });
   } catch (error) {
-    console.error("Error getting database stats:", error);
     res.status(500).json({
       message: "Failed to get database stats: " + error.message
     });
@@ -321,7 +290,6 @@ exports.deleteCompany = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error deleting company:", error);
     return res.status(500).json({
       message: "Failed to delete company: " + error.message
     });

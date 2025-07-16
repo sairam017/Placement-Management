@@ -23,17 +23,18 @@ function StudentPlacementRegisterForm() {
   const [success, setSuccess] = useState("");
 
   // Auto-populate form with student data when component mounts
+  const memoizedStudentData = React.useMemo(() => studentData, [studentData]);
   useEffect(() => {
-    if (studentData.UID || studentData.department || studentData.name || studentData.section) {
+    if (memoizedStudentData.UID || memoizedStudentData.department || memoizedStudentData.name || memoizedStudentData.section) {
       setFormData(prev => ({
         ...prev,
-        name: studentData.name || "",
-        UID: studentData.UID || "",
-        department: studentData.department || "",
-        section: studentData.section || ""
+        name: memoizedStudentData.name || "",
+        UID: memoizedStudentData.UID || "",
+        department: memoizedStudentData.department || "",
+        section: memoizedStudentData.section || ""
       }));
     }
-  }, [studentData]);
+  }, [memoizedStudentData]);
 
   const departmentOptions = [
     { value: "", label: "-- Select Department --" },

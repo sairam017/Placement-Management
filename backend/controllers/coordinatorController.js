@@ -1,3 +1,12 @@
+// Get unique departments for coordinators
+exports.getDepartments = async (req, res) => {
+  try {
+    const departments = await Coordinator.distinct("department");
+    res.json(departments.filter(Boolean).map(d => d.trim().toUpperCase()).sort());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 const Coordinator = require("../models/coordinatorModel");
 const bcrypt = require("bcryptjs");
 

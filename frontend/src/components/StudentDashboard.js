@@ -4,6 +4,14 @@ import axios from 'axios';
 import './StudentDashboard.css';
 
 const StudentDashboard = () => {
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
   const [student, setStudent] = useState({ name: '', UID: '', department: '', section: '' });
   const [companies, setCompanies] = useState([]);
   const [appliedCompanies, setAppliedCompanies] = useState([]);
@@ -238,6 +246,13 @@ const StudentDashboard = () => {
         <div className="profile-section">
           <div className="logout-container">
             <button
+              className="change-password-btn"
+              onClick={() => setShowPasswordModal(true)}
+              style={{ marginRight: '10px' }}
+            >
+              Change Password
+            </button>
+            <button
               className="logout-btn"
               onClick={() => {
                 localStorage.clear();
@@ -247,6 +262,120 @@ const StudentDashboard = () => {
               Logout
             </button>
           </div>
+        {/* Change Password Modal */}
+        {showPasswordModal && (
+          <div className="modal-overlay">
+            <div className="modal-container">
+              <div className="modal-header">
+                <h5 className="modal-title">Change Password</h5>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                    setPasswordMessage('');
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setIsChangingPassword(true);
+                  setPasswordMessage('');
+                  if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+                    setPasswordMessage('All fields are required.');
+                    setIsChangingPassword(false);
+                    return;
+                  }
+                  if (passwordData.newPassword !== passwordData.confirmPassword) {
+                    setPasswordMessage('New passwords do not match.');
+                    setIsChangingPassword(false);
+                    return;
+                  }
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await axios.post('http://localhost:5000/api/students/change-password', {
+                      oldPassword: passwordData.oldPassword,
+                      newPassword: passwordData.newPassword
+                    }, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setPasswordMessage(res.data.message || 'Password changed successfully.');
+                    setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                    setShowPasswordModal(false);
+                    // Optionally show a success alert
+                    alert(res.data.message || 'Password changed successfully.');
+                    navigate(0); // Reload the dashboard
+                  } catch (err) {
+                    setPasswordMessage(err.response?.data?.message || 'Failed to change password.');
+                  } finally {
+                    setIsChangingPassword(false);
+                  }
+                }}
+              >
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label htmlFor="oldPassword">Current Password</label>
+                    <input
+                      type="password"
+                      id="oldPassword"
+                      value={passwordData.oldPassword}
+                      onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="newPassword">New Password</label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={passwordData.newPassword}
+                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="confirmPassword">Confirm New Password</label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      value={passwordData.confirmPassword}
+                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  {passwordMessage && (
+                    <div className="alert alert-info">{passwordMessage}</div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                      setPasswordMessage('');
+                    }}
+                    disabled={isChangingPassword}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="submit-btn"
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? 'Changing...' : 'Change Password'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
           
           <h2>Welcome, {student.name || <span className="missing-data">No Name</span>}</h2>
           

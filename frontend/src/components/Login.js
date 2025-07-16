@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const LoginForm = ({
@@ -24,6 +24,35 @@ const LoginForm = ({
   setUserDepartment,
   handleLogin
 }) => {
+  const [departments, setDepartments] = useState([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
+  const [pcDepartments, setPcDepartments] = useState([]);
+  const [isLoadingPcDepartments, setIsLoadingPcDepartments] = useState(false);
+
+  useEffect(() => {
+    if (userType === 'student') {
+      setIsLoadingDepartments(true);
+      fetch('http://localhost:5000/api/students/departments')
+        .then(res => res.json())
+        .then(data => {
+          const uniqueDepartments = Array.isArray(data) ? data.map(d => d.trim().toUpperCase()).sort() : [];
+          setDepartments(uniqueDepartments);
+        })
+        .catch(() => setDepartments([]))
+        .finally(() => setIsLoadingDepartments(false));
+    } else if (userType === 'placement-coordinator') {
+      setIsLoadingPcDepartments(true);
+      fetch('http://localhost:5000/api/coordinators/departments')
+        .then(res => res.json())
+        .then(data => {
+          const uniqueDepartments = Array.isArray(data) ? data.map(d => d.trim().toUpperCase()).sort() : [];
+          setPcDepartments(uniqueDepartments);
+        })
+        .catch(() => setPcDepartments([]))
+        .finally(() => setIsLoadingPcDepartments(false));
+    }
+  }, [userType]);
+
   return (
     <form onSubmit={handleLogin}>
       <div className="form-group mb-2">
@@ -56,10 +85,12 @@ const LoginForm = ({
               className="form-control"
               value={studentLoginDepartment}
               onChange={(e) => setStudentLoginDepartment(e.target.value)}
+              disabled={isLoadingDepartments}
             >
-              <option value="">Select Department</option>
-              <option value="MCA">MCA</option>
-              <option value="MBA">MBA</option>
+              <option value="">{isLoadingDepartments ? 'Loading departments...' : 'Select Department'}</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
             </select>
           </div>
           <div className="form-group mb-2 position-relative">
@@ -104,10 +135,12 @@ const LoginForm = ({
               className="form-control"
               value={userDepartment}
               onChange={(e) => setUserDepartment(e.target.value)}
+              disabled={isLoadingPcDepartments}
             >
-              <option value="">Select Department</option>
-              <option value="MCA">MCA</option>
-              <option value="MBA">MBA</option>
+              <option value="">{isLoadingPcDepartments ? 'Loading departments...' : 'Select Department'}</option>
+              {pcDepartments.map((dept) => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
             </select>
           </div>
           <div className="form-group mb-2 position-relative">
