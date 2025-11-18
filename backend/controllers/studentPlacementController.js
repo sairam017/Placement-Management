@@ -194,6 +194,35 @@ exports.getStudentByUID = async (req, res) => {
   }
 };
 
+// Mark notifications as read for a student (all or specific)
+exports.markNotificationsRead = async (req, res) => {
+  try {
+    const { UID } = req.params;
+    const { notificationId, markAll } = req.body;
+
+    const student = await StudentPlacement.findOne({ UID });
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    if (markAll) {
+      student.notifications = student.notifications.map(n => ({ ...n._doc, read: true }));
+    } else if (notificationId) {
+      student.notifications = student.notifications.map(n => {
+        if (String(n._id) === String(notificationId)) {
+          return { ...n._doc, read: true };
+        }
+        return n;
+      });
+    } else {
+      return res.status(400).json({ message: 'notificationId or markAll required' });
+    }
+
+    await student.save();
+    res.status(200).json({ message: 'Notifications updated', notifications: student.notifications });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update notifications', error: err.message });
+  }
+};
+
 // ✅ Update student placement registration
 exports.updatePlacementRegistration = async (req, res) => {
   try {

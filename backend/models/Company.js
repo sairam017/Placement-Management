@@ -21,6 +21,14 @@ const companySchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  companyWebsite: {
+    type: String,
+    required: false
+  },
+  applicationLink: {
+    type: String,
+    required: false
+  },
   studentUIDs: [
     {
       type: Number,

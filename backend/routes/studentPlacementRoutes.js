@@ -60,4 +60,7 @@ router.put(
 // ✅ Get student by UID (must be last GET route to avoid conflicts)
 router.get('/:UID', studentPlacementController.getStudentByUID);
 
+// ✅ Mark notifications read (body: { notificationId, markAll })
+router.put('/:UID/notifications/mark-read', studentPlacementController.markNotificationsRead);
+
 module.exports = router;

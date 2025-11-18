@@ -1,5 +1,6 @@
 const Company = require("../models/Company");
 const StudentPlacement = require("../models/studentPlacementModel");
+const { sendMail } = require('../utils/mailer');
 
 // Helper for environment-aware logging
 const isDev = process.env.NODE_ENV !== 'production';
@@ -16,7 +17,7 @@ const logCurrentIndexes = async () => {
 
 // ✅ Add new company (no overwriting, no deletion)
 exports.addCompany = async (req, res) => {
-  const { companyName, role, ctc, description, department, studentUIDs } = req.body;
+  const { companyName, role, ctc, description, department, studentUIDs, companyWebsite, applicationLink } = req.body;
 
   if (!companyName || !role || !ctc || !description || !department) {
     return res.status(400).json({ message: "All fields are required" });
@@ -32,16 +33,122 @@ exports.addCompany = async (req, res) => {
       description: description.trim(),
       department: department.trim(),
       studentUIDs: Array.isArray(studentUIDs) ? studentUIDs : [],
+      companyWebsite: companyWebsite || '',
+      applicationLink: applicationLink || '',
       createdAt: new Date()
     });
 
     const savedCompany = await newCompany.save();
 
+    // Prepare notification
+    const notification = {
+      title: `New Placement: ${savedCompany.companyName}`,
+      message: savedCompany.description,
+      companyId: savedCompany._id,
+      companyName: savedCompany.companyName,
+      role: savedCompany.role,
+      ctc: savedCompany.ctc,
+      applicationLink: savedCompany.applicationLink || '',
+      companyWebsite: savedCompany.companyWebsite || '',
+      read: false,
+      createdAt: new Date()
+    };
+
+    // Determine recipients: ONLY notify specific UIDs if provided (selected students only)
+    let studentsToNotify = [];
+    if (Array.isArray(savedCompany.studentUIDs) && savedCompany.studentUIDs.length > 0) {
+      studentsToNotify = await StudentPlacement.find({ UID: { $in: savedCompany.studentUIDs } });
+    } else {
+      // No specific UIDs provided -> do not send emails/notifications automatically (avoid department-wide spams)
+      console.log(`ℹ️ No studentUIDs provided for ${savedCompany.companyName}; skipping notifications/emails.`);
+      return res.status(201).json({
+        message: "Company placement opportunity added successfully (no notifications sent - no selected students).",
+        company: savedCompany,
+        action: "created",
+        permanent: true
+      });
+    }
+
+    // Log recipients info
+    try {
+      const total = studentsToNotify.length;
+      const withEmail = studentsToNotify.filter(s => s.mailid).length;
+      console.log(`📣 Notifying ${total} students (${withEmail} with email addresses) for company ${savedCompany.companyName}`);
+    } catch (e) {
+      // ignore
+    }
+
+    // Push notification to student documents (non-blocking)
+    try {
+      const ids = studentsToNotify.map(s => s._id);
+      if (ids.length > 0) {
+        await StudentPlacement.updateMany(
+          { _id: { $in: ids } },
+          { $push: { notifications: notification } }
+        );
+      }
+    } catch (err) {
+      // Don't fail the main request for notification write errors
+      console.error('Failed to write notifications to students:', err?.message || err);
+    }
+
+    // Send emails asynchronously (do not block response) and collect results
+  let emailResults = { sent: 0, failed: 0, previews: [] };
+    try {
+      const appLink = savedCompany.applicationLink && savedCompany.applicationLink.trim()
+        ? savedCompany.applicationLink.trim()
+        : `http://localhost:3000/student-dashboard?companyId=${savedCompany._id}`;
+
+      const companySite = savedCompany.companyWebsite && savedCompany.companyWebsite.trim()
+        ? `<p>Company website: <a href="${savedCompany.companyWebsite}" target="_blank" rel="noopener">${savedCompany.companyWebsite}</a></p>`
+        : '';
+
+      const emailPromises = studentsToNotify.map(async (student) => {
+        if (!student.mailid) {
+          console.log(`⚠️ Skipping email for UID ${student.UID} - no mailid`);
+          return { status: 'skipped' };
+        }
+        const to = student.mailid;
+        const subject = `Placements Dept: New Opportunity - ${savedCompany.companyName}`;
+        const html = `<p>Dear ${student.name || 'Student'},</p>
+          <p><strong>You got a new chance to join <em>${savedCompany.companyName}</em>!</strong></p>
+          <p>Role: ${savedCompany.role} &nbsp;|&nbsp; CTC: ${savedCompany.ctc} LPA</p>
+          <p>${savedCompany.description}</p>
+          ${companySite}
+          <p>Apply here: <a href="${appLink}" target="_blank" rel="noopener">Complete Application Form</a></p>
+          <p>Regards,<br/>Placements Dept</p>`;
+        try {
+          const r = await sendMail({ to, subject, html });
+          if (r && r.success) return { status: 'sent', to, info: r.info, preview: r.previewUrl };
+          return { status: 'failed', to, error: r.error || 'unknown' };
+        } catch (err) {
+          return { status: 'failed', to, error: err?.message || err };
+        }
+      });
+
+      const results = await Promise.all(emailPromises);
+      results.forEach(r => {
+        if (!r) return;
+        if (r.status === 'sent') {
+          emailResults.sent++;
+          if (r.preview) emailResults.previews.push(r.preview);
+        } else if (r.status === 'skipped') {
+          // skipped
+        } else emailResults.failed++;
+      });
+    } catch (err) {
+      console.error('Error sending notification emails:', err?.message || err);
+    }
+
     return res.status(201).json({
       message: "Company placement opportunity added successfully!",
       company: savedCompany,
       action: "created",
-      permanent: true
+      permanent: true,
+      notifications: {
+        recipients: studentsToNotify.length,
+        emails: emailResults
+      }
     });
   } catch (error) {
     return res.status(500).json({
@@ -200,12 +307,95 @@ exports.addStudentsToCompany = async (req, res) => {
 
     const savedCompany = await newCompanyEntry.save();
 
+    // Prepare notification for this new round
+    const notification = {
+      title: `New Placement Round: ${savedCompany.companyName}`,
+      message: savedCompany.description,
+      companyId: savedCompany._id,
+      companyName: savedCompany.companyName,
+      role: savedCompany.role,
+      ctc: savedCompany.ctc,
+      applicationLink: savedCompany.applicationLink || '',
+      companyWebsite: savedCompany.companyWebsite || '',
+      read: false,
+      createdAt: new Date()
+    };
+
+    // Find students by UIDs and push notifications
+    let studentsToNotify = await StudentPlacement.find({ UID: { $in: studentUIDs } });
+    try {
+      const ids = studentsToNotify.map(s => s._id);
+      const total = studentsToNotify.length;
+      const withEmail = studentsToNotify.filter(s => s.mailid).length;
+      console.log(`📣 Notifying ${total} students ( ${withEmail} with email ) for new round of ${savedCompany.companyName}`);
+      if (ids.length > 0) {
+        await StudentPlacement.updateMany(
+          { _id: { $in: ids } },
+          { $push: { notifications: notification } }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to write notifications for new round:', err?.message || err);
+    }
+
+    // Send emails to the selected students
+  let emailResults = { sent: 0, failed: 0, previews: [] };
+    try {
+      const appLink = savedCompany.applicationLink && savedCompany.applicationLink.trim()
+        ? savedCompany.applicationLink.trim()
+        : `http://localhost:3000/student-dashboard?companyId=${savedCompany._id}`;
+
+      const companySite = savedCompany.companyWebsite && savedCompany.companyWebsite.trim()
+        ? `<p>Company website: <a href="${savedCompany.companyWebsite}" target="_blank" rel="noopener">${savedCompany.companyWebsite}</a></p>`
+        : '';
+
+      const emailPromises = studentsToNotify.map(async (student) => {
+        if (!student.mailid) {
+          console.log(`⚠️ Skipping email for UID ${student.UID} - no mailid`);
+          return { status: 'skipped' };
+        }
+        const to = student.mailid;
+        const subject = `Placements Dept: You're invited - ${savedCompany.companyName}`;
+        const html = `<p>Dear ${student.name || 'Student'},</p>
+          <p><strong>You have been added to a new placement round for <em>${savedCompany.companyName}</em>.</strong></p>
+          <p>Role: ${savedCompany.role} &nbsp;|&nbsp; CTC: ${savedCompany.ctc} LPA</p>
+          <p>${savedCompany.description}</p>
+          ${companySite}
+          <p>Apply here: <a href="${appLink}" target="_blank" rel="noopener">Complete Application Form</a></p>
+          <p>Regards,<br/>Placements Dept</p>`;
+        try {
+          const r = await sendMail({ to, subject, html });
+          if (r && r.success) return { status: 'sent', to, info: r.info, preview: r.previewUrl };
+          return { status: 'failed', to, error: r.error || 'unknown' };
+        } catch (err) {
+          return { status: 'failed', to, error: err?.message || err };
+        }
+      });
+
+      const results = await Promise.all(emailPromises);
+      results.forEach(r => {
+        if (!r) return;
+        if (r.status === 'sent') {
+          emailResults.sent++;
+          if (r.preview) emailResults.previews.push(r.preview);
+        } else if (r.status === 'skipped') {
+          // skipped
+        } else emailResults.failed++;
+      });
+    } catch (err) {
+      console.error('Error sending emails for new round:', err?.message || err);
+    }
+
     return res.status(201).json({
       message: "New placement round created successfully!",
       company: savedCompany,
       originalCompanyId: companyId,
       action: "new_round_created",
-      permanent: true
+      permanent: true,
+      notifications: {
+        recipients: studentsToNotify.length,
+        emails: emailResults
+      }
     });
   } catch (error) {
     return res.status(500).json({

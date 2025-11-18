@@ -33,6 +33,8 @@ const StudentDashboard = () => {
   });
   const [resume, setResume] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,6 +94,16 @@ const StudentDashboard = () => {
     fetchData();
   }, [student.UID, student.department]);
 
+  // Poll for placement data (and notifications) every 15 seconds to approximate real-time
+  useEffect(() => {
+    if (!student.UID) return;
+    // Initial fetch already done by other effect, but ensure periodic updates
+    const iv = setInterval(() => {
+      fetchCurrentPlacementData();
+    }, 15000); // 15s
+    return () => clearInterval(iv);
+  }, [student.UID]);
+
   useEffect(() => {
     if (location.state?.message) {
       setSuccessMessage(location.state.message);
@@ -147,6 +159,8 @@ const StudentDashboard = () => {
       
       if (response.data) {
         const data = response.data;
+        // store notifications if present
+        setNotifications(data.notifications || []);
         setUpdateData({
           name: data.name || '',
           department: data.department || '',
@@ -222,6 +236,46 @@ const StudentDashboard = () => {
     setShowUpdateModal(true);
   };
 
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllNotificationsRead = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.put(`http://localhost:5000/api/student-placement/${student.UID}/notifications/mark-read`, {
+        markAll: true
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(res.data.notifications || []);
+    } catch (err) {
+      console.error('Failed to mark notifications read:', err);
+      alert('Failed to mark notifications read');
+    }
+  };
+
+  const markNotificationRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem('token');
+      // Optimistic update
+      setNotifications(prev => prev.map(n => n._id === notificationId ? { ...n, read: true } : n));
+
+      const res = await axios.put(`http://localhost:5000/api/student-placement/${student.UID}/notifications/mark-read`, {
+        notificationId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data && res.data.notifications) {
+        setNotifications(res.data.notifications);
+      }
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+      alert('Failed to mark notification read');
+      // Revert optimistic update on error by re-fetching placement data
+      fetchCurrentPlacementData();
+    }
+  };
+
   const filteredCompanies = showOnlyApplied
     ? companies.filter((c) => hasAppliedToCompany(c._id))
     : companies;
@@ -251,6 +305,17 @@ const StudentDashboard = () => {
               style={{ marginRight: '10px' }}
             >
               Change Password
+            </button>
+            <button
+              className="notifications-btn"
+              onClick={() => setShowNotificationsModal(true)}
+              style={{ marginRight: '10px', position: 'relative' }}
+              title="Notifications"
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span className="notification-badge">{unreadCount}</span>
+              )}
             </button>
             <button
               className="logout-btn"
@@ -661,6 +726,68 @@ const StudentDashboard = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Modal */}
+        {showNotificationsModal && (
+          <div className="modal-overlay">
+            <div className="modal-container">
+              <div className="modal-header">
+                <h5 className="modal-title">Notifications</h5>
+                <button type="button" className="close-btn" onClick={() => setShowNotificationsModal(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                {notifications.length === 0 ? (
+                  <p>No notifications</p>
+                ) : (
+                  <ul className="notification-list">
+                      {notifications.slice().reverse().map(n => (
+                        <li key={n._id} className={`notification-item ${n.read ? 'read' : 'unread'}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="notification-title">{n.companyName || n.title}</div>
+                            <div>
+                              {!n.read ? (
+                                <button
+                                  className="mark-read-btn"
+                                  onClick={() => markNotificationRead(n._id)}
+                                  style={{ marginLeft: 10 }}
+                                >
+                                  Mark read
+                                </button>
+                              ) : (
+                                <span className="read-label">Read</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="notification-message">
+                            {n.role && (<div><strong>Role:</strong> {n.role}</div>)}
+                            {typeof n.ctc !== 'undefined' && (<div><strong>CTC:</strong> {n.ctc} LPA</div>)}
+                            <div style={{ marginTop: 6 }}>{n.message}</div>
+                          </div>
+                          <div className="notification-meta" style={{ marginTop: 8 }}>
+                            {n.applicationLink && (
+                              <a href={n.applicationLink} target="_blank" rel="noopener noreferrer">Apply here</a>
+                            )}
+                            {n.companyWebsite && (
+                              <span style={{ marginLeft: 10 }}>
+                                <a href={n.companyWebsite} target="_blank" rel="noopener noreferrer">Company site</a>
+                              </span>
+                            )}
+                            <div><small>{new Date(n.createdAt).toLocaleString()}</small></div>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowNotificationsModal(false)}>Close</button>
+                {notifications.length > 0 && (
+                  <button className="btn btn-primary" onClick={async () => { await markAllNotificationsRead(); }}>Mark all read</button>
+                )}
+              </div>
             </div>
           </div>
         )}

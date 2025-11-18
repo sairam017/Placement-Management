@@ -24,6 +24,16 @@ const studentPlacementSchema = new mongoose.Schema({
       updatedAt: { type: Date, default: Date.now }
     }
   ],
+  // Notifications array for real-time notifications / email events
+  notifications: [
+    {
+      title: { type: String },
+      message: { type: String },
+      companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
+      read: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now }
+    }
+  ],
   createdAt: { type: Date, default: Date.now }
 });
 
